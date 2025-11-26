@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 
@@ -10,6 +10,7 @@ export interface WordTimestamp {
 
 @Injectable()
 export class TtsService {
+  private readonly logger = new Logger(TtsService.name);
   private speechConfig: sdk.SpeechConfig;
 
   constructor(private configService: ConfigService) {
@@ -17,7 +18,7 @@ export class TtsService {
     const region = this.configService.get<string>('AZURE_SPEECH_REGION');
 
     if (!key || !region) {
-      console.warn('Azure Speech credentials not configured');
+      this.logger.warn('Azure Speech credentials not configured');
       return;
     }
 
