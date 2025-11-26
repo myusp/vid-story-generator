@@ -78,13 +78,13 @@ export class EdgeTtsService {
         const tempSsmlPath = outputPath.replace(/\.\w+$/, '.ssml');
         fs.writeFileSync(tempSsmlPath, text);
         args = ['--voice', voice, '--write-media', outputPath, '--file', tempSsmlPath];
-        command = `edge-tts ${args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ')}`;
+        command = `edge-tts ${args.map(arg => `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(' ')}`;
       } else {
         // Escape text properly by writing to temp file
         const tempTextPath = outputPath.replace(/\.\w+$/, '.txt');
         fs.writeFileSync(tempTextPath, text);
         args = ['--voice', voice, '--write-media', outputPath, '--file', tempTextPath];
-        command = `edge-tts ${args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ')}`;
+        command = `edge-tts ${args.map(arg => `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(' ')}`;
       }
 
       await execAsync(command);
