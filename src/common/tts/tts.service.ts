@@ -115,9 +115,16 @@ export class TtsService {
 
   /**
    * Strip SSML tags from text to get plain text
+   * This is only for internal use to extract plain text from SSML for timestamp generation
    */
   private stripSsml(text: string): string {
-    return text.replace(/<[^>]*>/g, '').trim();
+    // Remove all XML/SSML tags including nested ones
+    let result = text;
+    // Keep replacing until no more tags found (handles nested tags)
+    while (/<[^>]*>/g.test(result)) {
+      result = result.replace(/<[^>]*>/g, '');
+    }
+    return result.trim();
   }
 
   /**
