@@ -54,6 +54,27 @@ export class StoryController {
     return { message: 'Generation started', id };
   }
 
+  @Post(':id/retry')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Retry/resume failed or incomplete generation' })
+  @ApiResponse({
+    status: 200,
+    description: 'Retry started',
+  })
+  async retryGeneration(@Param('id') id: string) {
+    const project = await this.storyService.getProject(id);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // Run generation in background with resume capability
+    this.storyService.generateFullStory(id).catch((error) => {
+      console.error('Retry generation failed:', error);
+    });
+
+    return { message: 'Retry started', id, currentStatus: project.status };
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all projects' })
   @ApiResponse({

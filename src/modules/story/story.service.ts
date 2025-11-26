@@ -70,6 +70,7 @@ export class StoryService {
     try {
       const project = await this.prisma.storyProject.findUnique({
         where: { id: projectId },
+        include: { scenes: true },
       });
 
       if (!project) {
@@ -79,123 +80,151 @@ export class StoryService {
       const provider =
         (project.modelProvider as 'gemini' | 'openai') || 'gemini';
 
-      // Step 1: Generate metadata
-      await this.logMessage(
-        projectId,
-        'INFO',
-        'GENERATING_METADATA',
-        'Generating story metadata...',
-      );
-      const metadata = await this.aiService.generateStoryMetadata(
-        project.topic,
-        project.genre,
-        project.language,
-        provider,
-      );
+      // Step 1: Generate metadata (skip if already done)
+      if (project.status === StoryStatus.PENDING || !project.titleGenerated) {
+        await this.logMessage(
+          projectId,
+          'INFO',
+          'GENERATING_METADATA',
+          'Generating story metadata...',
+        );
+        const metadata = await this.aiService.generateStoryMetadata(
+          project.topic,
+          project.genre,
+          project.language,
+          provider,
+        );
 
-      await this.prisma.storyProject.update({
-        where: { id: projectId },
-        data: {
-          titleGenerated: metadata.title,
-          descriptionGenerated: metadata.description,
-          hashtagsGenerated: metadata.hashtags,
-          status: StoryStatus.STORY_PROMPT_READY,
-        },
-      });
-
-      // Step 2: Generate narrations only (NEW MULTI-STEP FLOW)
-      await this.logMessage(
-        projectId,
-        'INFO',
-        'GENERATING_NARRATIONS',
-        'Generating scene narrations...',
-      );
-      await this.prisma.storyProject.update({
-        where: { id: projectId },
-        data: { status: StoryStatus.GENERATING_SCENES },
-      });
-
-      const narrations = await this.aiService.generateNarrations(
-        project.topic,
-        project.genre,
-        project.language,
-        project.totalImages,
-        project.narrativeTone || '',
-        provider,
-      );
-
-      // Create initial scenes with narrations only
-      for (const narration of narrations) {
-        await this.prisma.storyScene.create({
+        await this.prisma.storyProject.update({
+          where: { id: projectId },
           data: {
-            projectId,
-            order: narration.order,
-            narration: narration.narration,
+            titleGenerated: metadata.title,
+            descriptionGenerated: metadata.description,
+            hashtagsGenerated: metadata.hashtags,
+            status: StoryStatus.STORY_PROMPT_READY,
           },
         });
       }
 
-      // Step 3: Generate image prompts for each narration
-      await this.logMessage(
-        projectId,
-        'INFO',
-        'GENERATING_IMAGE_PROMPTS',
-        'Generating image prompts...',
-      );
+      // Step 2: Generate narrations only (skip if scenes exist with narrations)
+      const existingScenes = await this.prisma.storyScene.findMany({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+      });
 
+      if (existingScenes.length === 0 || !existingScenes[0].narration) {
+        await this.logMessage(
+          projectId,
+          'INFO',
+          'GENERATING_NARRATIONS',
+          'Generating scene narrations...',
+        );
+        await this.prisma.storyProject.update({
+          where: { id: projectId },
+          data: { status: StoryStatus.GENERATING_SCENES },
+        });
+
+        const narrations = await this.aiService.generateNarrations(
+          project.topic,
+          project.genre,
+          project.language,
+          project.totalImages,
+          project.narrativeTone || '',
+          provider,
+        );
+
+        // Create initial scenes with narrations only
+        for (const narration of narrations) {
+          await this.prisma.storyScene.create({
+            data: {
+              projectId,
+              order: narration.order,
+              narration: narration.narration,
+            },
+          });
+        }
+      }
+
+      // Step 3: Generate image prompts in batches (skip if already generated)
       const dbScenes = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
 
-      for (const scene of dbScenes) {
-        const imagePrompt = await this.aiService.generateImagePrompt(
-          scene.narration,
+      const scenesWithoutImagePrompts = dbScenes.filter(s => !s.imagePrompt);
+      if (scenesWithoutImagePrompts.length > 0) {
+        await this.logMessage(
+          projectId,
+          'INFO',
+          'GENERATING_IMAGE_PROMPTS',
+          `Generating image prompts in batches (${scenesWithoutImagePrompts.length} remaining)...`,
+        );
+
+        // Use batch processing for image prompts
+        const imagePromptBatch = await this.aiService.generateImagePromptsBatch(
+          scenesWithoutImagePrompts.map(s => ({ order: s.order, narration: s.narration })),
           project.imageStyle || '',
           provider,
         );
 
-        await this.prisma.storyScene.update({
-          where: { id: scene.id },
-          data: { imagePrompt: imagePrompt.trim() },
-        });
+        // Update scenes with image prompts
+        for (const result of imagePromptBatch) {
+          const scene = scenesWithoutImagePrompts.find(s => s.order === result.order);
+          if (scene) {
+            await this.prisma.storyScene.update({
+              where: { id: scene.id },
+              data: { imagePrompt: result.imagePrompt.trim() },
+            });
+          }
+        }
       }
 
-      // Step 4: Generate SSML and animations for each scene
-      await this.logMessage(
-        projectId,
-        'INFO',
-        'GENERATING_SSML_ANIMATIONS',
-        'Generating SSML and animations...',
-      );
-
+      // Step 4: Generate SSML in batches and animations (skip if already generated)
       const scenesWithPrompts = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
 
-      for (const scene of scenesWithPrompts) {
-        // Generate SSML
-        const ssml = this.ttsService.convertToSsml(
-          scene.narration,
-          project.speakerCode,
+      const scenesWithoutSSML = scenesWithPrompts.filter(s => !s.ssml);
+      if (scenesWithoutSSML.length > 0) {
+        await this.logMessage(
+          projectId,
+          'INFO',
+          'GENERATING_SSML_ANIMATIONS',
+          `Generating SSML and animations (${scenesWithoutSSML.length} remaining)...`,
         );
 
-        // Generate animations
-        const animations = await this.aiService.generateAnimations(
-          scene.narration,
+        // Use batch processing for SSML
+        const ssmlBatch = await this.aiService.generateSSMLBatch(
+          scenesWithoutSSML.map(s => ({ order: s.order, narration: s.narration })),
+          project.speakerCode,
           provider,
         );
 
-        await this.prisma.storyScene.update({
-          where: { id: scene.id },
-          data: {
-            ssml,
-            animationIn: animations.animationIn,
-            animationShow: animations.animationShow,
-            animationOut: animations.animationOut,
-          },
-        });
+        // Update scenes with SSML and generate animations
+        for (const scene of scenesWithoutSSML) {
+          const ssmlResult = ssmlBatch.find(s => s.order === scene.order);
+          const ssml = ssmlResult?.ssml || this.ttsService.convertToSsml(
+            scene.narration,
+            project.speakerCode,
+          );
+
+          // Generate animations
+          const animations = await this.aiService.generateAnimations(
+            scene.narration,
+            provider,
+          );
+
+          await this.prisma.storyScene.update({
+            where: { id: scene.id },
+            data: {
+              ssml,
+              animationIn: animations.animationIn,
+              animationShow: animations.animationShow,
+              animationOut: animations.animationOut,
+            },
+          });
+        }
       }
 
       // Step 5: Generate images
