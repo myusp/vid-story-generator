@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TtsService } from './tts.service';
+import { EdgeTtsService } from './edge-tts.service';
 
 @Module({
-  providers: [TtsService],
-  exports: [TtsService],
+  providers: [EdgeTtsService],
+  exports: [EdgeTtsService],
 })
 export class TtsModule {}

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsInt, IsEnum, Min } from 'class-validator';
+import { IsString, IsInt, IsEnum, Min, IsOptional } from 'class-validator';
 
 export enum ModelProvider {
   GEMINI = 'gemini',
@@ -9,6 +9,25 @@ export enum ModelProvider {
 export enum VideoOrientation {
   PORTRAIT = 'PORTRAIT',
   LANDSCAPE = 'LANDSCAPE',
+}
+
+export enum ImageStyle {
+  REALISTIC = 'realistic',
+  CARTOON = 'cartoon',
+  ANIMATION_90S = 'animation_90s',
+  GHIBLI = 'ghibli',
+  ANIME = 'anime',
+  PIXAR = 'pixar',
+  WATERCOLOR = 'watercolor',
+}
+
+export enum NarrativeTone {
+  CASUAL = 'casual',
+  FORMAL = 'formal',
+  FUNNY = 'funny',
+  DRAMATIC = 'dramatic',
+  INSPIRATIONAL = 'inspirational',
+  MYSTERIOUS = 'mysterious',
 }
 
 export class StartStoryDto {
@@ -34,7 +53,7 @@ export class StartStoryDto {
   language: string;
 
   @ApiProperty({
-    description: 'Azure TTS speaker code',
+    description: 'Edge-TTS speaker code',
     example: 'id-ID-ArdiNeural',
   })
   @IsString()
@@ -64,4 +83,24 @@ export class StartStoryDto {
   })
   @IsEnum(ModelProvider)
   modelProvider: ModelProvider;
+
+  @ApiProperty({
+    description: 'Image style for generation',
+    enum: ImageStyle,
+    example: ImageStyle.REALISTIC,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ImageStyle)
+  imageStyle?: ImageStyle;
+
+  @ApiProperty({
+    description: 'Narrative tone/style',
+    enum: NarrativeTone,
+    example: NarrativeTone.CASUAL,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(NarrativeTone)
+  narrativeTone?: NarrativeTone;
 }

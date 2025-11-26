@@ -18,6 +18,9 @@ model StoryProject {
   speakerCode      String
   orientation      String
   totalImages      Int
+  modelProvider    String      @default("gemini")
+  imageStyle       String?
+  narrativeTone    String?
 
   titleGenerated       String?
   descriptionGenerated String?
@@ -41,10 +44,14 @@ model StoryScene {
   order         Int
   imagePrompt   String?
   narration     String?
+  ssml          String?
   imagePath     String?
   audioPath     String?
   startTimeMs   Int?
   endTimeMs     Int?
+  animationIn   String?
+  animationShow String?
+  animationOut  String?
 
   project       StoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId     String

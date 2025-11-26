@@ -16,6 +16,22 @@ export interface StoryMetadata {
   hashtags: string;
 }
 
+export interface NarrationOnly {
+  order: number;
+  narration: string;
+}
+
+export interface ImagePromptData {
+  order: number;
+  imagePrompt: string;
+}
+
+export interface AnimationData {
+  animationIn?: string;
+  animationShow?: string;
+  animationOut?: string;
+}
+
 @Injectable()
 export class AiService {
   constructor(
@@ -40,6 +56,99 @@ Return ONLY a JSON object in this exact format:
 
     const response = await this.callAI(prompt, provider);
     return JSON.parse(this.extractJSON(response));
+  }
+
+  /**
+   * Step 1: Generate narrations only
+   */
+  async generateNarrations(
+    topic: string,
+    genre: string,
+    language: string,
+    totalScenes: number,
+    narrativeTone: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<NarrationOnly[]> {
+    const toneDescription = narrativeTone ? ` with a ${narrativeTone} tone` : '';
+    const prompt = `Create a story for a ${totalScenes}-scene short video about: "${topic}" in ${genre} genre${toneDescription}. Language: ${language}.
+
+Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "narration": "narration text in ${language}"
+  }
+]
+
+Create exactly ${totalScenes} narrations.`;
+
+    const response = await this.callAI(prompt, provider);
+    const narrations = JSON.parse(this.extractJSON(response));
+
+    return narrations.map((item: any, index: number) => ({
+      order: item.order || index + 1,
+      narration: item.narration,
+    }));
+  }
+
+  /**
+   * Step 2: Generate image prompt for a specific narration
+   */
+  async generateImagePrompt(
+    narration: string,
+    imageStyle: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<string> {
+    const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
+    const prompt = `Based on this narration: "${narration}"
+
+Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
+
+The prompt should be in English and describe:
+- Main subject/characters
+- Setting/environment
+- Mood/atmosphere
+- Visual details
+- Composition
+
+Return ONLY the image prompt as plain text, no JSON.`;
+
+    return await this.callAI(prompt, provider);
+  }
+
+  /**
+   * Step 3: Determine animations for a scene
+   */
+  async generateAnimations(
+    narration: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<AnimationData> {
+    const prompt = `Based on this narration: "${narration}"
+
+Suggest appropriate Ken Burns style animations for the image in this scene. Choose from these options:
+- animationIn: fade, slide-left, slide-right, slide-up, slide-down, zoom-in, zoom-out, none
+- animationShow: pan-left, pan-right, pan-up, pan-down, zoom-slow, static, none  
+- animationOut: fade, slide-left, slide-right, slide-up, slide-down, zoom-in, zoom-out, none
+
+Return ONLY a JSON object (animations are optional based on narration mood):
+{
+  "animationIn": "fade",
+  "animationShow": "pan-right",
+  "animationOut": "zoom-out"
+}
+
+If no animation is needed for a particular transition, you can omit that field.`;
+
+    const response = await this.callAI(prompt, provider);
+    const animations = JSON.parse(this.extractJSON(response));
+    
+    return {
+      animationIn: animations.animationIn,
+      animationShow: animations.animationShow,
+      animationOut: animations.animationOut,
+    };
   }
 
   async generateScenes(
@@ -90,7 +199,7 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
   private async callGemini(prompt: string): Promise<string> {
     const apiKey = this.apiKeyRolling.getNextGeminiKey();
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
     const result = await model.generateContent(prompt);
     const response = await result.response;

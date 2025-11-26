@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiService } from '../../common/ai/ai.service';
-import { TtsService } from '../../common/tts/tts.service';
+import { EdgeTtsService } from '../../common/tts/edge-tts.service';
 import { ImageService } from '../../common/image/image.service';
 import { FfmpegService } from '../../common/ffmpeg/ffmpeg.service';
 import { SrtGenerator } from '../../common/utils/srt-generator';
@@ -17,7 +17,7 @@ export class StoryService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private aiService: AiService,
-    private ttsService: TtsService,
+    private ttsService: EdgeTtsService,
     private imageService: ImageService,
     private ffmpegService: FfmpegService,
   ) {
@@ -49,6 +49,9 @@ export class StoryService {
         speakerCode: dto.speaker,
         orientation: dto.orientation,
         totalImages: dto.totalImages,
+        modelProvider: dto.modelProvider,
+        imageStyle: dto.imageStyle,
+        narrativeTone: dto.narrativeTone,
         status: StoryStatus.PENDING,
       },
     });
