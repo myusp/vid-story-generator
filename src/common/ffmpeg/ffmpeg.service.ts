@@ -16,6 +16,7 @@ export interface SceneFragment {
 @Injectable()
 export class FfmpegService {
   private readonly logger = new Logger(FfmpegService.name);
+  private readonly VIDEO_FPS = 30; // Default frame rate for video rendering
 
   constructor(private configService: ConfigService) {}
 
@@ -49,7 +50,7 @@ export class FfmpegService {
 
         const command = ffmpeg()
           .input(imagePath)
-          .loop(audioDuration + 1) // Loop image for the duration
+          .loop(Math.ceil(audioDuration) + 1) // Loop image for the duration (ensure integer)
           .input(audioPath)
           .complexFilter(filters)
           .outputOptions([
@@ -176,7 +177,7 @@ export class FfmpegService {
     animation: string,
     duration: number,
   ): string | null {
-    const fps = 30;
+    const fps = this.VIDEO_FPS;
     const frames = Math.floor(duration * fps);
 
     switch (animation) {

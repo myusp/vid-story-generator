@@ -213,8 +213,7 @@ export class StoryService {
         for (const scene of scenesWithoutSSML) {
           const ssmlResult = ssmlBatch.find((s) => s.order === scene.order);
           const ssml =
-            ssmlResult?.ssml ||
-            this.ttsService.convertToSsml(scene.narration);
+            ssmlResult?.ssml || this.ttsService.convertToSsml(scene.narration);
 
           // Generate animations
           const animations = await this.aiService.generateAnimations(
