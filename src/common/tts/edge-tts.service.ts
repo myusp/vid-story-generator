@@ -65,25 +65,40 @@ export class EdgeTtsService {
         fs.mkdirSync(dir, { recursive: true });
       }
 
-      // Build edge-tts command
-      let command = `edge-tts --voice "${voice}" --write-media "${outputPath}"`;
+      // Validate inputs to prevent command injection
+      if (!voice || typeof voice !== 'string' || voice.includes(';') || voice.includes('&')) {
+        throw new Error('Invalid voice parameter');
+      }
+
+      let command: string;
+      let args: string[] = [];
       
       if (useSsml) {
         // Write SSML to temp file
         const tempSsmlPath = outputPath.replace(/\.\w+$/, '.ssml');
         fs.writeFileSync(tempSsmlPath, text);
-        command += ` --file "${tempSsmlPath}"`;
+        args = ['--voice', voice, '--write-media', outputPath, '--file', tempSsmlPath];
+        command = `edge-tts ${args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ')}`;
       } else {
-        command += ` --text "${text.replace(/"/g, '\\"')}"`;
+        // Escape text properly by writing to temp file
+        const tempTextPath = outputPath.replace(/\.\w+$/, '.txt');
+        fs.writeFileSync(tempTextPath, text);
+        args = ['--voice', voice, '--write-media', outputPath, '--file', tempTextPath];
+        command = `edge-tts ${args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ')}`;
       }
 
       await execAsync(command);
 
-      // Clean up temp SSML file if it exists
+      // Clean up temp files
       if (useSsml) {
         const tempSsmlPath = outputPath.replace(/\.\w+$/, '.ssml');
         if (fs.existsSync(tempSsmlPath)) {
           fs.unlinkSync(tempSsmlPath);
+        }
+      } else {
+        const tempTextPath = outputPath.replace(/\.\w+$/, '.txt');
+        if (fs.existsSync(tempTextPath)) {
+          fs.unlinkSync(tempTextPath);
         }
       }
 
@@ -132,8 +147,8 @@ export class EdgeTtsService {
     ssmlText = ssmlText.replace(/!/g, '!<break time="600ms"/>');
     ssmlText = ssmlText.replace(/\?/g, '?<break time="600ms"/>');
 
-    // Add emphasis to exclamations and questions
-    ssmlText = ssmlText.replace(/([^.!?]+[!])/g, '<emphasis level="strong">$1</emphasis>');
+    // Add emphasis to exclamations - look for sentences ending with !
+    ssmlText = ssmlText.replace(/([^.?]+!)/g, '<emphasis level="strong">$1</emphasis>');
 
     return ssmlText;
   }

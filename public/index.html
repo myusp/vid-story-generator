@@ -526,8 +526,8 @@
                 orientation: document.getElementById('orientation').value,
                 totalImages: parseInt(document.getElementById('totalImages').value),
                 modelProvider: document.getElementById('modelProvider').value,
-                imageStyle: document.getElementById('imageStyle').value || undefined,
-                narrativeTone: document.getElementById('narrativeTone').value || undefined,
+                imageStyle: document.getElementById("imageStyle").value || null,
+                narrativeTone: document.getElementById("narrativeTone").value || null,
             };
 
             if (!data.speaker) {

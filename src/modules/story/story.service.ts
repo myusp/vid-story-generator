@@ -264,7 +264,7 @@ export class StoryService {
       for (const scene of scenesWithImages) {
         const audioPath = path.join(
           audioDir,
-          `${projectId}_scene_${scene.order}.mp3`,
+          `${projectId}_scene_${scene.order}.wav`,
         );
         
         // Use SSML for speech generation
