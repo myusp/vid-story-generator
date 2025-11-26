@@ -7,7 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { LogsService } from './logs.service';
+import { LogsService, LogEvent } from './logs.service';
 
 @ApiTags('stories')
 @ApiSecurity('api-key')
@@ -27,7 +27,9 @@ export class LogsController {
 
   @Sse('stream')
   @ApiOperation({ summary: 'Stream logs in real-time (SSE)' })
-  streamLogs(@Param('projectId') projectId: string): Observable<any> {
+  streamLogs(
+    @Param('projectId') projectId: string,
+  ): Observable<{ data: LogEvent }> {
     const logSubject = this.logsService.getLogStream(projectId);
 
     return logSubject.pipe(

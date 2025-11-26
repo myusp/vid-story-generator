@@ -28,7 +28,7 @@ export class LogsService {
     if (!this.logSubjects.has(projectId)) {
       this.logSubjects.set(projectId, new Subject<LogEvent>());
     }
-    return this.logSubjects.get(projectId);
+    return this.logSubjects.get(projectId)!;
   }
 
   emitLog(event: LogEvent) {
