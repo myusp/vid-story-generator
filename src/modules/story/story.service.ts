@@ -76,6 +76,8 @@ export class StoryService {
         throw new Error('Project not found');
       }
 
+      const provider = (project.modelProvider as 'gemini' | 'openai') || 'gemini';
+
       // Step 1: Generate metadata
       await this.logMessage(
         projectId,
@@ -87,7 +89,7 @@ export class StoryService {
         project.topic,
         project.genre,
         project.language,
-        'gemini',
+        provider,
       );
 
       await this.prisma.storyProject.update({
@@ -100,38 +102,102 @@ export class StoryService {
         },
       });
 
-      // Step 2: Generate scenes
+      // Step 2: Generate narrations only (NEW MULTI-STEP FLOW)
       await this.logMessage(
         projectId,
         'INFO',
-        'GENERATING_SCENES',
-        'Generating scenes...',
+        'GENERATING_NARRATIONS',
+        'Generating scene narrations...',
       );
       await this.prisma.storyProject.update({
         where: { id: projectId },
         data: { status: StoryStatus.GENERATING_SCENES },
       });
 
-      const scenes = await this.aiService.generateScenes(
+      const narrations = await this.aiService.generateNarrations(
         project.topic,
         project.genre,
         project.language,
         project.totalImages,
-        'gemini',
+        project.narrativeTone || '',
+        provider,
       );
 
-      for (const scene of scenes) {
+      // Create initial scenes with narrations only
+      for (const narration of narrations) {
         await this.prisma.storyScene.create({
           data: {
             projectId,
-            order: scene.order,
-            imagePrompt: scene.imagePrompt,
-            narration: scene.narration,
+            order: narration.order,
+            narration: narration.narration,
           },
         });
       }
 
-      // Step 3: Generate images
+      // Step 3: Generate image prompts for each narration
+      await this.logMessage(
+        projectId,
+        'INFO',
+        'GENERATING_IMAGE_PROMPTS',
+        'Generating image prompts...',
+      );
+
+      const dbScenes = await this.prisma.storyScene.findMany({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+      });
+
+      for (const scene of dbScenes) {
+        const imagePrompt = await this.aiService.generateImagePrompt(
+          scene.narration,
+          project.imageStyle || '',
+          provider,
+        );
+
+        await this.prisma.storyScene.update({
+          where: { id: scene.id },
+          data: { imagePrompt: imagePrompt.trim() },
+        });
+      }
+
+      // Step 4: Generate SSML and animations for each scene
+      await this.logMessage(
+        projectId,
+        'INFO',
+        'GENERATING_SSML_ANIMATIONS',
+        'Generating SSML and animations...',
+      );
+
+      const scenesWithPrompts = await this.prisma.storyScene.findMany({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+      });
+
+      for (const scene of scenesWithPrompts) {
+        // Generate SSML
+        const ssml = this.ttsService.convertToSsml(
+          scene.narration,
+          project.speakerCode,
+        );
+
+        // Generate animations
+        const animations = await this.aiService.generateAnimations(
+          scene.narration,
+          provider,
+        );
+
+        await this.prisma.storyScene.update({
+          where: { id: scene.id },
+          data: {
+            ssml,
+            animationIn: animations.animationIn,
+            animationShow: animations.animationShow,
+            animationOut: animations.animationOut,
+          },
+        });
+      }
+
+      // Step 5: Generate images
       await this.logMessage(
         projectId,
         'INFO',
@@ -143,7 +209,7 @@ export class StoryService {
         data: { status: StoryStatus.GENERATING_IMAGES },
       });
 
-      const dbScenes = await this.prisma.storyScene.findMany({
+      const scenesWithSsml = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
@@ -155,7 +221,7 @@ export class StoryService {
       const width = project.orientation === 'PORTRAIT' ? 720 : 1280;
       const height = project.orientation === 'PORTRAIT' ? 1280 : 720;
 
-      for (const scene of dbScenes) {
+      for (const scene of scenesWithSsml) {
         const imagePath = path.join(
           imageDir,
           `${projectId}_scene_${scene.order}.jpg`,
@@ -172,12 +238,12 @@ export class StoryService {
         });
       }
 
-      // Step 4: Generate TTS
+      // Step 6: Generate TTS using SSML
       await this.logMessage(
         projectId,
         'INFO',
         'GENERATING_TTS',
-        'Generating audio...',
+        'Generating audio with SSML...',
       );
       await this.prisma.storyProject.update({
         where: { id: projectId },
@@ -190,15 +256,23 @@ export class StoryService {
       );
       let currentTime = 0;
 
-      for (const scene of dbScenes) {
+      const scenesWithImages = await this.prisma.storyScene.findMany({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+      });
+
+      for (const scene of scenesWithImages) {
         const audioPath = path.join(
           audioDir,
-          `${projectId}_scene_${scene.order}.wav`,
+          `${projectId}_scene_${scene.order}.mp3`,
         );
+        
+        // Use SSML for speech generation
         const result = await this.ttsService.generateSpeech(
-          scene.narration,
+          scene.ssml || scene.narration,
           project.speakerCode,
           audioPath,
+          !!scene.ssml, // useSsml = true if ssml exists
         );
 
         await this.prisma.storyScene.update({
@@ -213,12 +287,12 @@ export class StoryService {
         currentTime += result.durationMs;
       }
 
-      // Step 5: Render video
+      // Step 7: Render video with animations
       await this.logMessage(
         projectId,
         'INFO',
         'RENDERING_VIDEO',
-        'Rendering video...',
+        'Rendering video with animations...',
       );
       await this.prisma.storyProject.update({
         where: { id: projectId },
@@ -263,7 +337,7 @@ export class StoryService {
         }
       }
 
-      // Step 6: Generate SRT
+      // Step 8: Generate SRT
       const srtOutputDir = this.configService.get<string>(
         'SRT_OUTPUT_DIR',
         './storage/subtitles',
@@ -315,7 +389,6 @@ export class StoryService {
       throw error;
     }
   }
-
   async getProject(id: string) {
     return this.prisma.storyProject.findUnique({
       where: { id },
