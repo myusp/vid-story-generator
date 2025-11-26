@@ -151,7 +151,7 @@ export class StoryService {
         orderBy: { order: 'asc' },
       });
 
-      const scenesWithoutImagePrompts = dbScenes.filter(s => !s.imagePrompt);
+      const scenesWithoutImagePrompts = dbScenes.filter((s) => !s.imagePrompt);
       if (scenesWithoutImagePrompts.length > 0) {
         await this.logMessage(
           projectId,
@@ -162,14 +162,19 @@ export class StoryService {
 
         // Use batch processing for image prompts
         const imagePromptBatch = await this.aiService.generateImagePromptsBatch(
-          scenesWithoutImagePrompts.map(s => ({ order: s.order, narration: s.narration })),
+          scenesWithoutImagePrompts.map((s) => ({
+            order: s.order,
+            narration: s.narration,
+          })),
           project.imageStyle || '',
           provider,
         );
 
         // Update scenes with image prompts
         for (const result of imagePromptBatch) {
-          const scene = scenesWithoutImagePrompts.find(s => s.order === result.order);
+          const scene = scenesWithoutImagePrompts.find(
+            (s) => s.order === result.order,
+          );
           if (scene) {
             await this.prisma.storyScene.update({
               where: { id: scene.id },
@@ -185,7 +190,7 @@ export class StoryService {
         orderBy: { order: 'asc' },
       });
 
-      const scenesWithoutSSML = scenesWithPrompts.filter(s => !s.ssml);
+      const scenesWithoutSSML = scenesWithPrompts.filter((s) => !s.ssml);
       if (scenesWithoutSSML.length > 0) {
         await this.logMessage(
           projectId,
@@ -196,18 +201,20 @@ export class StoryService {
 
         // Use batch processing for SSML
         const ssmlBatch = await this.aiService.generateSSMLBatch(
-          scenesWithoutSSML.map(s => ({ order: s.order, narration: s.narration })),
+          scenesWithoutSSML.map((s) => ({
+            order: s.order,
+            narration: s.narration,
+          })),
           project.speakerCode,
           provider,
         );
 
         // Update scenes with SSML and generate animations
         for (const scene of scenesWithoutSSML) {
-          const ssmlResult = ssmlBatch.find(s => s.order === scene.order);
-          const ssml = ssmlResult?.ssml || this.ttsService.convertToSsml(
-            scene.narration,
-            project.speakerCode,
-          );
+          const ssmlResult = ssmlBatch.find((s) => s.order === scene.order);
+          const ssml =
+            ssmlResult?.ssml ||
+            this.ttsService.convertToSsml(scene.narration, project.speakerCode);
 
           // Generate animations
           const animations = await this.aiService.generateAnimations(

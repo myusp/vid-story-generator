@@ -57,8 +57,12 @@ export class AiService {
     private configService: ConfigService,
     private apiKeyRolling: ApiKeyRollingService,
   ) {
-    this.maxRetries = parseInt(configService.get<string>('AI_MAX_RETRIES', '3'));
-    this.retryDelay = parseInt(configService.get<string>('AI_RETRY_DELAY_MS', '10000'));
+    this.maxRetries = parseInt(
+      configService.get<string>('AI_MAX_RETRIES', '3'),
+    );
+    this.retryDelay = parseInt(
+      configService.get<string>('AI_RETRY_DELAY_MS', '10000'),
+    );
     this.batchSize = parseInt(configService.get<string>('AI_BATCH_SIZE', '4'));
   }
 
@@ -92,7 +96,9 @@ Return ONLY a JSON object in this exact format:
     narrativeTone: string,
     provider: 'gemini' | 'openai',
   ): Promise<NarrationOnly[]> {
-    const toneDescription = narrativeTone ? ` with a ${narrativeTone} tone` : '';
+    const toneDescription = narrativeTone
+      ? ` with a ${narrativeTone} tone`
+      : '';
     const prompt = `Create a story for a ${totalScenes}-scene short video about: "${topic}" in ${genre} genre${toneDescription}. Language: ${language}.
 
 Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
@@ -125,11 +131,15 @@ Create exactly ${totalScenes} narrations.`;
     provider: 'gemini' | 'openai',
   ): Promise<ImagePromptData[]> {
     const results: ImagePromptData[] = [];
-    
+
     // Process in batches
     for (let i = 0; i < narrations.length; i += this.batchSize) {
       const batch = narrations.slice(i, i + this.batchSize);
-      const batchResults = await this.generateImagePromptBatch(batch, imageStyle, provider);
+      const batchResults = await this.generateImagePromptBatch(
+        batch,
+        imageStyle,
+        provider,
+      );
       results.push(...batchResults);
     }
 
@@ -142,8 +152,10 @@ Create exactly ${totalScenes} narrations.`;
     provider: 'gemini' | 'openai',
   ): Promise<ImagePromptData[]> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
-    const narrationsText = narrations.map(n => `Scene ${n.order}: "${n.narration}"`).join('\n');
-    
+    const narrationsText = narrations
+      .map((n) => `Scene ${n.order}: "${n.narration}"`)
+      .join('\n');
+
     const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
 
 ${narrationsText}
@@ -206,11 +218,15 @@ Return ONLY the image prompt as plain text, no JSON.`;
     provider: 'gemini' | 'openai',
   ): Promise<Array<{ order: number; ssml: string }>> {
     const results: Array<{ order: number; ssml: string }> = [];
-    
+
     // Process in batches
     for (let i = 0; i < narrations.length; i += this.batchSize) {
       const batch = narrations.slice(i, i + this.batchSize);
-      const batchResults = await this.generateSSMLBatchInternal(batch, speaker, provider);
+      const batchResults = await this.generateSSMLBatchInternal(
+        batch,
+        speaker,
+        provider,
+      );
       results.push(...batchResults);
     }
 
@@ -222,8 +238,10 @@ Return ONLY the image prompt as plain text, no JSON.`;
     speaker: string,
     provider: 'gemini' | 'openai',
   ): Promise<Array<{ order: number; ssml: string }>> {
-    const narrationsText = narrations.map(n => `Scene ${n.order}: "${n.narration}"`).join('\n');
-    
+    const narrationsText = narrations
+      .map((n) => `Scene ${n.order}: "${n.narration}"`)
+      .join('\n');
+
     const prompt = `Convert these narrations to SSML format with expressive elements for speaker "${speaker}":
 
 ${narrationsText}
@@ -339,16 +357,22 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
         await this.sleep(this.retryDelay);
         return this.callAIWithRetry(prompt, provider, retryCount + 1);
       }
-      this.logger.error(`AI call failed after ${this.maxRetries + 1} attempts: ${error.message}`);
+      this.logger.error(
+        `AI call failed after ${this.maxRetries + 1} attempts: ${error.message}`,
+      );
       throw error;
     }
   }
 
   private async callGemini(prompt: string): Promise<string> {
     const apiKey = this.apiKeyRolling.getNextGeminiKey();
-    const baseUrl = this.configService.get<string>('GEMINI_API_URL');
-    const modelName = this.configService.get<string>('GEMINI_MODEL', 'gemini-2.0-flash-exp');
-    
+    // Note: GoogleGenerativeAI doesn't support custom baseURL in current version
+    // const baseUrl = this.configService.get<string>('GEMINI_API_URL');
+    const modelName = this.configService.get<string>(
+      'GEMINI_MODEL',
+      'gemini-2.0-flash-exp',
+    );
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
 
@@ -360,9 +384,12 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
   private async callOpenAI(prompt: string): Promise<string> {
     const apiKey = this.apiKeyRolling.getNextOpenAIKey();
     const baseURL = this.configService.get<string>('OPENAI_API_URL');
-    const modelName = this.configService.get<string>('OPENAI_MODEL', 'gpt-4o-mini');
-    
-    const openai = new OpenAI({ 
+    const modelName = this.configService.get<string>(
+      'OPENAI_MODEL',
+      'gpt-4o-mini',
+    );
+
+    const openai = new OpenAI({
       apiKey,
       ...(baseURL && { baseURL }),
     });
@@ -404,6 +431,6 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
