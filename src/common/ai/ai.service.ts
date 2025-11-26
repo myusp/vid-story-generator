@@ -336,12 +336,13 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
   }
 
   /**
-   * Call AI with retry logic
+   * Call AI with retry logic, API key rotation, and model fallback
    */
   private async callAIWithRetry(
     prompt: string,
     provider: 'gemini' | 'openai',
     retryCount: number = 0,
+    failedKeys: Set<string> = new Set(),
   ): Promise<string> {
     try {
       if (provider === 'gemini') {
@@ -350,15 +351,55 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
         return await this.callOpenAI(prompt);
       }
     } catch (error) {
+      const currentProvider = provider;
+
+      // Try with different API key of the same provider
       if (retryCount < this.maxRetries) {
         this.logger.warn(
-          `AI call failed (attempt ${retryCount + 1}/${this.maxRetries + 1}): ${error.message}. Retrying in ${this.retryDelay}ms...`,
+          `AI call failed with ${currentProvider} (attempt ${retryCount + 1}/${this.maxRetries + 1}): ${error.message}. Retrying with next API key in ${this.retryDelay}ms...`,
         );
         await this.sleep(this.retryDelay);
-        return this.callAIWithRetry(prompt, provider, retryCount + 1);
+
+        // Try with next API key from the same provider
+        return this.callAIWithRetry(
+          prompt,
+          currentProvider,
+          retryCount + 1,
+          failedKeys,
+        );
       }
+
+      // If all retries with current provider failed, try switching to alternate provider
+      const alternateProvider =
+        currentProvider === 'gemini' ? 'openai' : 'gemini';
+      const hasAlternateKeys =
+        alternateProvider === 'gemini'
+          ? this.apiKeyRolling.hasGeminiKeys()
+          : this.apiKeyRolling.hasOpenAIKeys();
+
+      if (hasAlternateKeys && !failedKeys.has(alternateProvider)) {
+        this.logger.warn(
+          `All ${currentProvider} attempts failed. Switching to ${alternateProvider}...`,
+        );
+        failedKeys.add(currentProvider);
+
+        try {
+          return await this.callAIWithRetry(
+            prompt,
+            alternateProvider,
+            0,
+            failedKeys,
+          );
+        } catch (altError) {
+          this.logger.error(
+            `Both providers failed. ${currentProvider}: ${error.message}, ${alternateProvider}: ${altError.message}`,
+          );
+          throw error;
+        }
+      }
+
       this.logger.error(
-        `AI call failed after ${this.maxRetries + 1} attempts: ${error.message}`,
+        `AI call failed after ${this.maxRetries + 1} attempts with ${currentProvider}: ${error.message}`,
       );
       throw error;
     }

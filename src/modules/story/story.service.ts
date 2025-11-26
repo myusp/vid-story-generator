@@ -214,7 +214,7 @@ export class StoryService {
           const ssmlResult = ssmlBatch.find((s) => s.order === scene.order);
           const ssml =
             ssmlResult?.ssml ||
-            this.ttsService.convertToSsml(scene.narration, project.speakerCode);
+            this.ttsService.convertToSsml(scene.narration);
 
           // Generate animations
           const animations = await this.aiService.generateAnimations(
@@ -356,10 +356,17 @@ export class StoryService {
           tmpDir,
           `${projectId}_scene_${scene.order}.mp4`,
         );
+
+        // Pass animation data to ffmpeg service
         await this.ffmpegService.createSceneVideo(
           scene.imagePath,
           scene.audioPath,
           sceneVideoPath,
+          {
+            animationIn: scene.animationIn,
+            animationShow: scene.animationShow,
+            animationOut: scene.animationOut,
+          },
         );
         sceneVideos.push(sceneVideoPath);
       }

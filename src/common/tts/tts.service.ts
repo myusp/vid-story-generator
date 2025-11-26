@@ -24,6 +24,8 @@ export class TtsService {
 
   /**
    * Generate speech using edge-tts-universal
+   * Note: edge-tts-universal DOES support SSML! The text parameter can contain SSML tags.
+   * The library automatically detects and processes SSML markup.
    */
   async generateSpeech(
     text: string,
@@ -43,10 +45,12 @@ export class TtsService {
       // Parse voice name (remove gender suffix if present)
       const voiceName = this.parseVoiceName(speaker);
 
-      // If SSML is used, the text already contains SSML tags
-      // edge-tts-universal will handle SSML automatically if the text contains it
+      // edge-tts-universal supports SSML directly in the text parameter
+      // If text contains SSML tags, it will be processed automatically
+      // No need for special handling - just pass the text as-is
       const tts = new EdgeTTS(text, voiceName, {
         rate: '+0%',
+        pitch: '+0Hz',
       });
 
       // Synthesize speech
@@ -64,6 +68,10 @@ export class TtsService {
       const plainText = useSsml ? this.stripSsml(text) : text;
       const timestamps = this.generateSimpleTimestamps(plainText, durationMs);
 
+      this.logger.log(
+        `Generated speech: ${outputPath} (${durationMs}ms, SSML: ${useSsml})`,
+      );
+
       return {
         audioPath: outputPath,
         durationMs,
@@ -77,18 +85,16 @@ export class TtsService {
 
   /**
    * Convert plain text narration to SSML with expressions
+   * Edge-TTS supports SSML directly - it will auto-detect SSML tags
    */
-  convertToSsml(text: string, voice: string): string {
-    // Basic SSML template with expression and style
+  convertToSsml(text: string): string {
+    // Add SSML expressions to the text
     const ssmlText = this.addSsmlExpression(text);
 
-    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
-    <voice name="${voice}">
-        <prosody rate="0%" pitch="0%">
-            ${ssmlText}
-        </prosody>
-    </voice>
-</speak>`;
+    // Edge-TTS auto-detects SSML, but we can use full format for better control
+    // Note: edge-tts-universal handles the <speak> wrapper internally
+    // We just need to provide the content with SSML tags
+    return ssmlText;
   }
 
   /**
