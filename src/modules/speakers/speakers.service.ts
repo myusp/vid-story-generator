@@ -1,21 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { EdgeTtsService } from '../../common/tts/edge-tts.service';
+import { TtsService } from '../../common/tts/tts.service';
 
 @Injectable()
 export class SpeakersService {
-  constructor(private edgeTtsService: EdgeTtsService) {}
+  constructor(private ttsService: TtsService) {}
 
   async listAvailableSpeakers() {
     try {
-      const voices = await this.edgeTtsService.listVoices();
+      const voices = await this.ttsService.listVoices();
 
       // Format voices with gender suffix for better display
       return voices.map((voice) => ({
-        name: `${voice.ShortName}-${voice.Gender}`,
-        shortName: voice.ShortName,
-        displayName: voice.FriendlyName,
-        locale: voice.Locale,
-        gender: voice.Gender,
+        name: `${voice.shortName}-${voice.gender}`,
+        shortName: voice.shortName,
+        displayName: voice.displayName || voice.name,
+        locale: voice.locale,
+        gender: voice.gender,
       }));
     } catch (error) {
       return [];

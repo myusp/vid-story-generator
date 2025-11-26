@@ -29,7 +29,7 @@ export class TtsService {
     text: string,
     speaker: string,
     outputPath: string,
-    rate: string = '+0%',
+    useSsml: boolean = false,
   ): Promise<{
     audioPath: string;
     durationMs: number;
@@ -43,9 +43,10 @@ export class TtsService {
       // Parse voice name (remove gender suffix if present)
       const voiceName = this.parseVoiceName(speaker);
 
-      // Initialize EdgeTTS with text and voice
+      // If SSML is used, the text already contains SSML tags
+      // edge-tts-universal will handle SSML automatically if the text contains it
       const tts = new EdgeTTS(text, voiceName, {
-        rate,
+        rate: '+0%',
       });
 
       // Synthesize speech
@@ -59,8 +60,9 @@ export class TtsService {
       // Edge-TTS-Universal doesn't provide word timestamps directly
       const durationMs = await this.estimateAudioDuration(outputPath);
 
-      // Generate simple timestamps based on text words
-      const timestamps = this.generateSimpleTimestamps(text, durationMs);
+      // Generate simple timestamps based on text words (strip SSML if present)
+      const plainText = useSsml ? this.stripSsml(text) : text;
+      const timestamps = this.generateSimpleTimestamps(plainText, durationMs);
 
       return {
         audioPath: outputPath,
@@ -71,6 +73,51 @@ export class TtsService {
       this.logger.error(`Speech synthesis failed: ${error.message}`);
       throw new Error(`Speech synthesis failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Convert plain text narration to SSML with expressions
+   */
+  convertToSsml(text: string, voice: string): string {
+    // Basic SSML template with expression and style
+    const ssmlText = this.addSsmlExpression(text);
+
+    return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+    <voice name="${voice}">
+        <prosody rate="0%" pitch="0%">
+            ${ssmlText}
+        </prosody>
+    </voice>
+</speak>`;
+  }
+
+  /**
+   * Add SSML expression to text based on punctuation
+   */
+  private addSsmlExpression(text: string): string {
+    // Add breaks and emphasis based on punctuation
+    let ssmlText = text;
+
+    // Add pauses after periods, commas, etc.
+    ssmlText = ssmlText.replace(/\./g, '.<break time="500ms"/>');
+    ssmlText = ssmlText.replace(/,/g, ',<break time="300ms"/>');
+    ssmlText = ssmlText.replace(/!/g, '!<break time="600ms"/>');
+    ssmlText = ssmlText.replace(/\?/g, '?<break time="600ms"/>');
+
+    // Add emphasis to exclamations - look for sentences ending with !
+    ssmlText = ssmlText.replace(
+      /([^.?]+!)/g,
+      '<emphasis level="strong">$1</emphasis>',
+    );
+
+    return ssmlText;
+  }
+
+  /**
+   * Strip SSML tags from text to get plain text
+   */
+  private stripSsml(text: string): string {
+    return text.replace(/<[^>]*>/g, '').trim();
   }
 
   /**

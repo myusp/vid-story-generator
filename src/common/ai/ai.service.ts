@@ -69,7 +69,9 @@ Return ONLY a JSON object in this exact format:
     narrativeTone: string,
     provider: 'gemini' | 'openai',
   ): Promise<NarrationOnly[]> {
-    const toneDescription = narrativeTone ? ` with a ${narrativeTone} tone` : '';
+    const toneDescription = narrativeTone
+      ? ` with a ${narrativeTone} tone`
+      : '';
     const prompt = `Create a story for a ${totalScenes}-scene short video about: "${topic}" in ${genre} genre${toneDescription}. Language: ${language}.
 
 Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
@@ -143,7 +145,7 @@ If no animation is needed for a particular transition, you can omit that field.`
 
     const response = await this.callAI(prompt, provider);
     const animations = JSON.parse(this.extractJSON(response));
-    
+
     return {
       animationIn: animations.animationIn,
       animationShow: animations.animationShow,

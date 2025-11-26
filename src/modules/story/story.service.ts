@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiService } from '../../common/ai/ai.service';
-import { EdgeTtsService } from '../../common/tts/edge-tts.service';
+import { TtsService } from '../../common/tts/tts.service';
 import { ImageService } from '../../common/image/image.service';
 import { FfmpegService } from '../../common/ffmpeg/ffmpeg.service';
 import { SrtGenerator } from '../../common/utils/srt-generator';
@@ -17,7 +17,7 @@ export class StoryService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private aiService: AiService,
-    private ttsService: EdgeTtsService,
+    private ttsService: TtsService,
     private imageService: ImageService,
     private ffmpegService: FfmpegService,
   ) {
@@ -76,7 +76,8 @@ export class StoryService {
         throw new Error('Project not found');
       }
 
-      const provider = (project.modelProvider as 'gemini' | 'openai') || 'gemini';
+      const provider =
+        (project.modelProvider as 'gemini' | 'openai') || 'gemini';
 
       // Step 1: Generate metadata
       await this.logMessage(
@@ -266,7 +267,7 @@ export class StoryService {
           audioDir,
           `${projectId}_scene_${scene.order}.wav`,
         );
-        
+
         // Use SSML for speech generation
         const result = await this.ttsService.generateSpeech(
           scene.ssml || scene.narration,
