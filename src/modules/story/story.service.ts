@@ -8,6 +8,7 @@ import { FfmpegService } from '../../common/ffmpeg/ffmpeg.service';
 import { SrtGenerator } from '../../common/utils/srt-generator';
 import { StartStoryDto } from '../../common/dto/start-story.dto';
 import { StoryStatus } from '../../common/enums/story-status.enum';
+import { LogsService } from '../logs/logs.service';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -20,6 +21,7 @@ export class StoryService {
     private ttsService: TtsService,
     private imageService: ImageService,
     private ffmpegService: FfmpegService,
+    private logsService: LogsService,
   ) {
     this.ensureDirectories();
   }
@@ -485,7 +487,8 @@ export class StoryService {
     message: string,
     meta?: any,
   ) {
-    return this.prisma.storyLog.create({
+    // Save to database
+    const log = await this.prisma.storyLog.create({
       data: {
         projectId,
         level,
@@ -494,5 +497,17 @@ export class StoryService {
         meta: meta ? JSON.stringify(meta) : null,
       },
     });
+
+    // Emit SSE event for real-time updates
+    this.logsService.emitLog({
+      projectId,
+      level,
+      code,
+      message,
+      meta,
+      timestamp: log.createdAt,
+    });
+
+    return log;
   }
 }

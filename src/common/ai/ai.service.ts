@@ -152,12 +152,58 @@ Create exactly ${totalScenes} narrations.`;
     // Process in batches
     for (let i = 0; i < narrations.length; i += this.batchSize) {
       const batch = narrations.slice(i, i + this.batchSize);
-      const batchResults = await this.generateImagePromptBatch(
-        batch,
-        imageStyle,
-        provider,
+      this.logger.log(
+        `Processing image prompts batch ${Math.floor(i / this.batchSize) + 1}: scenes ${batch.map((n) => n.order).join(', ')}`,
       );
-      results.push(...batchResults);
+
+      try {
+        const batchResults = await this.generateImagePromptBatch(
+          batch,
+          imageStyle,
+          provider,
+        );
+
+        // Create a map for O(1) lookups
+        const resultMap = new Map(batchResults.map((r) => [r.order, r]));
+
+        // Validate batch results and match them back to original narrations
+        for (const narration of batch) {
+          const result = resultMap.get(narration.order);
+          if (result && result.imagePrompt) {
+            results.push(result);
+          } else {
+            // Fallback: generate individually if batch result is missing
+            this.logger.warn(
+              `Missing result for scene ${narration.order}, generating individually`,
+            );
+            const singlePrompt = await this.generateImagePrompt(
+              narration.narration,
+              imageStyle,
+              provider,
+            );
+            results.push({
+              order: narration.order,
+              imagePrompt: singlePrompt,
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Batch failed for scenes ${batch.map((n) => n.order).join(', ')}, falling back to individual generation: ${error.message}`,
+        );
+        // Fallback: generate each one individually
+        for (const narration of batch) {
+          const singlePrompt = await this.generateImagePrompt(
+            narration.narration,
+            imageStyle,
+            provider,
+          );
+          results.push({
+            order: narration.order,
+            imagePrompt: singlePrompt,
+          });
+        }
+      }
     }
 
     return results.sort((a, b) => a.order - b.order);
@@ -177,27 +223,31 @@ Create exactly ${totalScenes} narrations.`;
 
 ${narrationsText}
 
-For each scene, create a prompt that includes:
+For EACH scene listed above, create a prompt that includes:
 - Main subject/characters
 - Setting/environment
 - Mood/atmosphere
 - Visual details
 - Composition
 
-Return ONLY a JSON array in this exact format:
+IMPORTANT: You MUST return a result for EACH scene with the EXACT order number specified above.
+
+Return ONLY a JSON array in this exact format (one entry for EACH scene):
 [
   {
     "order": 1,
     "imagePrompt": "detailed visual description for AI image generation"
   }
-]`;
+]
+
+Generate exactly ${narrations.length} results, one for each scene.`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const results = JSON.parse(this.extractJSON(response));
 
-    return results.map((item: any) => ({
-      order: item.order,
-      imagePrompt: item.imagePrompt,
+    return results.map((item: any, index: number) => ({
+      order: item.order != null ? parseInt(String(item.order), 10) : index + 1,
+      imagePrompt: item.imagePrompt || '',
     }));
   }
 
@@ -241,12 +291,62 @@ Return ONLY the image prompt as plain text, no JSON.`;
     // Process in batches
     for (let i = 0; i < narrations.length; i += this.batchSize) {
       const batch = narrations.slice(i, i + this.batchSize);
-      const batchResults = await this.generateProsodyBatchInternal(
-        batch,
-        narrativeTone,
-        provider,
+      this.logger.log(
+        `Processing prosody batch ${Math.floor(i / this.batchSize) + 1}: scenes ${batch.map((n) => n.order).join(', ')}`,
       );
-      results.push(...batchResults);
+
+      try {
+        const batchResults = await this.generateProsodyBatchInternal(
+          batch,
+          narrativeTone,
+          provider,
+        );
+
+        // Create a map for O(1) lookups
+        const resultMap = new Map(batchResults.map((r) => [r.order, r]));
+
+        // Validate and match back to original narrations
+        for (const narration of batch) {
+          const result = resultMap.get(narration.order);
+          if (result && result.segments && result.segments.length > 0) {
+            results.push(result);
+          } else {
+            // Fallback: create simple prosody data
+            this.logger.warn(
+              `Missing prosody result for scene ${narration.order}, using default`,
+            );
+            results.push({
+              order: narration.order,
+              segments: [
+                {
+                  text: narration.narration,
+                  rate: '+0%',
+                  volume: '+0%',
+                  pitch: '+0Hz',
+                },
+              ],
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Prosody batch failed for scenes ${batch.map((n) => n.order).join(', ')}, using defaults: ${error.message}`,
+        );
+        // Fallback: create simple prosody data for each
+        for (const narration of batch) {
+          results.push({
+            order: narration.order,
+            segments: [
+              {
+                text: narration.narration,
+                rate: '+0%',
+                volume: '+0%',
+                pitch: '+0Hz',
+              },
+            ],
+          });
+        }
+      }
     }
 
     return results.sort((a, b) => a.order - b.order);
@@ -280,6 +380,8 @@ Examples:
 Narrations:
 ${narrationsText}
 
+IMPORTANT: You MUST return a result for EACH scene with the EXACT order number specified above.
+
 Return ONLY a JSON array with prosody segments for each scene:
 [
   {
@@ -296,15 +398,16 @@ Rules:
 1. Split based on emotional changes, punctuation, and meaning
 2. Each segment should be a complete phrase (don't split mid-word)
 3. The combined segments should equal the full narration text
-4. Use realistic prosody values (rate: -30% to +30%, volume: -50% to +50%, pitch: -20Hz to +20Hz)`;
+4. Use realistic prosody values (rate: -30% to +30%, volume: -50% to +50%, pitch: -20Hz to +20Hz)
+5. Generate exactly ${narrations.length} results, one for each scene.`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const results = JSON.parse(this.extractJSON(response));
 
-    return results.map((item: any) => ({
-      order: item.order,
-      segments: item.segments.map((s: any) => ({
-        text: s.text,
+    return results.map((item: any, index: number) => ({
+      order: item.order != null ? parseInt(String(item.order), 10) : index + 1,
+      segments: (item.segments || []).map((s: any) => ({
+        text: s.text || '',
         rate: s.rate || '+0%',
         volume: s.volume || '+0%',
         pitch: s.pitch || '+0Hz',
@@ -374,6 +477,7 @@ Return ONLY a JSON array with SSML for each scene:
 
   /**
    * Step 4: Determine animations for a scene
+   * Uses enhanced Ken Burns effects for more engaging video
    */
   async generateAnimations(
     narration: string,
@@ -382,26 +486,59 @@ Return ONLY a JSON array with SSML for each scene:
     const prompt = `Based on this narration: "${narration}"
 
 Suggest appropriate Ken Burns style animations for the image in this scene. Choose from these options:
-- animationIn: fade, slide-left, slide-right, slide-up, slide-down, zoom-in, zoom-out, none
-- animationShow: pan-left, pan-right, pan-up, pan-down, zoom-slow, static, none  
-- animationOut: fade, slide-left, slide-right, slide-up, slide-down, zoom-in, zoom-out, none
 
-Return ONLY a JSON object (animations are optional based on narration mood):
+- animationIn (entrance): fade, zoom-in, zoom-out, none
+- animationShow (main movement - ALWAYS use one of these for engaging video):
+  * pan-left: Camera moves from right to left - good for action, movement
+  * pan-right: Camera moves from left to right - good for journey, progress
+  * pan-up: Camera moves from bottom to top - good for revealing, inspiration
+  * pan-down: Camera moves from top to bottom - good for descending, suspense
+  * pan-diagonal-left: Diagonal movement top-right to bottom-left - dynamic
+  * pan-diagonal-right: Diagonal movement top-left to bottom-right - dynamic
+  * zoom-slow: Gentle zoom in - good for focus, intimacy
+  * zoom-in: Dramatic zoom in - good for climax, emphasis
+  * zoom-out: Zoom out - good for reveal, context
+  * zoom-pan-left: Zoom while panning left - very dynamic action
+  * zoom-pan-right: Zoom while panning right - very dynamic action
+- animationOut (exit): fade, zoom-in, zoom-out, none
+
+IMPORTANT: 
+- ALWAYS include animationShow for every scene to keep viewers engaged
+- Vary animations between scenes - don't repeat the same animation consecutively
+- Match animation to mood: action=pan/zoom-pan, suspense=zoom-slow, reveal=zoom-out, etc.
+
+Return ONLY a JSON object:
 {
   "animationIn": "fade",
   "animationShow": "pan-right",
-  "animationOut": "zoom-out"
-}
-
-If no animation is needed for a particular transition, you can omit that field.`;
+  "animationOut": "fade"
+}`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const animations = JSON.parse(this.extractJSON(response));
 
+    // Ensure animationShow always has a value for engaging video
+    if (
+      !animations.animationShow ||
+      animations.animationShow === 'none' ||
+      animations.animationShow === 'static'
+    ) {
+      const defaultAnimations = [
+        'pan-left',
+        'pan-right',
+        'pan-up',
+        'pan-down',
+        'zoom-slow',
+        'zoom-in',
+      ];
+      animations.animationShow =
+        defaultAnimations[Math.floor(Math.random() * defaultAnimations.length)];
+    }
+
     return {
-      animationIn: animations.animationIn,
+      animationIn: animations.animationIn || 'fade',
       animationShow: animations.animationShow,
-      animationOut: animations.animationOut,
+      animationOut: animations.animationOut || 'fade',
     };
   }
 

@@ -35,7 +35,7 @@
             margin: 100px auto;
         }
 
-        h1, h2 {
+        h1, h2, h3 {
             color: #333;
             margin-bottom: 20px;
         }
@@ -179,20 +179,64 @@
             margin-bottom: 20px;
         }
 
-        .speaker-list {
-            max-height: 200px;
-            overflow-y: auto;
+        /* Enhanced Speaker List Styles */
+        .speaker-container {
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            padding: 10px;
             margin-top: 10px;
         }
 
-        .speaker-item {
+        .speaker-filters {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .speaker-filters select {
             padding: 8px;
+            font-size: 13px;
+        }
+
+        .speaker-tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .speaker-tab {
+            padding: 10px 20px;
             cursor: pointer;
-            border-radius: 4px;
-            margin-bottom: 4px;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-weight: 600;
+            width: auto;
+        }
+
+        .speaker-tab.active {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .speaker-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .speaker-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #fafafa;
+            transition: all 0.2s;
         }
 
         .speaker-item:hover {
@@ -200,8 +244,73 @@
         }
 
         .speaker-item.selected {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+        }
+
+        .speaker-info {
+            flex: 1;
+        }
+
+        .speaker-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .speaker-meta {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .speaker-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .speaker-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            width: auto;
+            transition: all 0.2s;
+        }
+
+        .play-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .play-btn:hover {
+            background: #45a049;
+        }
+
+        .play-btn.playing {
+            background: #f44336;
+        }
+
+        .fav-btn {
+            background: transparent;
+            color: #ff9800;
+            font-size: 18px;
+            padding: 4px 8px;
+        }
+
+        .fav-btn.favorited {
+            color: #ff5722;
+        }
+
+        .speaker-search {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .speaker-search input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
         }
 
         .tabs {
@@ -377,6 +486,40 @@
             font-family: monospace;
         }
 
+        .gender-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        .gender-badge.Female {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .gender-badge.Male {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .sse-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+
+        .sse-status.connected {
+            background: #4caf50;
+        }
+
+        .sse-status.disconnected {
+            background: #f44336;
+        }
+
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -389,6 +532,10 @@
             .modal-content {
                 width: 95%;
                 margin: 10% auto;
+            }
+
+            .speaker-filters {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -505,9 +652,37 @@
 
                 <div class="form-group">
                     <label>Speaker Voice *</label>
-                    <button type="button" onclick="loadSpeakers()" style="margin-bottom: 10px;">Load Speakers</button>
                     <input type="text" id="selectedSpeaker" readonly placeholder="Select a speaker from the list below">
-                    <div id="speakerList" class="speaker-list hidden"></div>
+                    
+                    <div class="speaker-container" id="speakerContainer">
+                        <div class="speaker-search">
+                            <input type="text" id="speakerSearch" placeholder="Search speakers..." onkeyup="filterSpeakers()">
+                        </div>
+                        
+                        <div class="speaker-filters">
+                            <select id="filterLanguage" onchange="filterSpeakers()">
+                                <option value="">All Languages</option>
+                            </select>
+                            <select id="filterGender" onchange="filterSpeakers()">
+                                <option value="">All Genders</option>
+                                <option value="Female">Female</option>
+                                <option value="Male">Male</option>
+                            </select>
+                            <button type="button" onclick="loadSpeakers()" style="padding: 8px;">🔄 Refresh</button>
+                        </div>
+
+                        <div class="speaker-tabs">
+                            <button type="button" class="speaker-tab active" onclick="switchSpeakerTab('all')">All Voices</button>
+                            <button type="button" class="speaker-tab" onclick="switchSpeakerTab('favorites')">⭐ Favorites</button>
+                        </div>
+
+                        <div id="speakerList" class="speaker-list">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading speakers...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <button type="submit" id="submitBtn">Create Story</button>
@@ -516,8 +691,8 @@
 
         <!-- Projects Tab -->
         <div id="projectsTab" class="tab-content">
-            <h2>My Projects</h2>
-            <button onclick="loadProjects()" style="margin-bottom: 20px; width: auto;">Refresh Projects</button>
+            <h2>My Projects <span id="sseStatus" class="sse-status disconnected" title="SSE Status"></span></h2>
+            <button onclick="loadProjects()" style="margin-bottom: 20px; width: auto;">🔄 Refresh Projects</button>
             
             <div id="projectsLoading" class="loading hidden">
                 <div class="spinner"></div>
@@ -547,6 +722,11 @@
     <script>
         let API_KEY = '';
         const API_URL = window.location.origin;
+        let allSpeakers = [];
+        let favorites = JSON.parse(localStorage.getItem('speakerFavorites') || '[]');
+        let currentAudio = null;
+        let currentPlayingBtn = null;
+        let sseConnections = new Map();
 
         // Login functionality
         async function login() {
@@ -571,6 +751,7 @@
                     localStorage.setItem('apiKey', apiKey);
                     document.getElementById('loginScreen').classList.add('hidden');
                     document.getElementById('mainContent').classList.remove('hidden');
+                    loadSpeakers();
                     loadProjects();
                 } else {
                     showError(errorDiv, 'Invalid API key');
@@ -583,6 +764,9 @@
         function logout() {
             API_KEY = '';
             localStorage.removeItem('apiKey');
+            // Close all SSE connections
+            sseConnections.forEach((connection) => connection.close());
+            sseConnections.clear();
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('mainContent').classList.add('hidden');
             document.getElementById('apiKey').value = '';
@@ -612,11 +796,21 @@
             }
         }
 
+        // Speaker tab switching
+        function switchSpeakerTab(tab) {
+            document.querySelectorAll('.speaker-tab').forEach(t => t.classList.remove('active'));
+            if (tab === 'all') {
+                document.querySelector('.speaker-tab:nth-child(1)').classList.add('active');
+            } else {
+                document.querySelector('.speaker-tab:nth-child(2)').classList.add('active');
+            }
+            renderSpeakers(tab === 'favorites');
+        }
+
         // Load speakers
         async function loadSpeakers() {
             const speakerList = document.getElementById('speakerList');
-            speakerList.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-            speakerList.classList.remove('hidden');
+            speakerList.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading speakers...</p></div>';
 
             try {
                 const response = await fetch(`${API_URL}/speakers`, {
@@ -627,23 +821,141 @@
 
                 if (!response.ok) throw new Error('Failed to load speakers');
                 
-                const speakers = await response.json();
+                allSpeakers = await response.json();
                 
-                speakerList.innerHTML = '';
-                speakers.forEach(speaker => {
-                    const div = document.createElement('div');
-                    div.className = 'speaker-item';
-                    div.textContent = `${speaker.displayName} (${speaker.locale}) - ${speaker.gender}`;
-                    div.onclick = () => {
-                        document.querySelectorAll('.speaker-item').forEach(item => 
-                            item.classList.remove('selected'));
-                        div.classList.add('selected');
-                        document.getElementById('selectedSpeaker').value = speaker.shortName;
-                    };
-                    speakerList.appendChild(div);
-                });
+                // Populate language filter
+                const languages = [...new Set(allSpeakers.map(s => s.locale.split('-')[0]))].sort();
+                const langSelect = document.getElementById('filterLanguage');
+                langSelect.innerHTML = '<option value="">All Languages</option>' +
+                    languages.map(lang => `<option value="${lang}">${lang.toUpperCase()}</option>`).join('');
+                
+                renderSpeakers();
             } catch (error) {
-                speakerList.innerHTML = '<p style="color: red;">Failed to load speakers</p>';
+                speakerList.innerHTML = '<p style="color: red; text-align: center;">Failed to load speakers</p>';
+            }
+        }
+
+        // Filter speakers
+        function filterSpeakers() {
+            renderSpeakers(document.querySelector('.speaker-tab:nth-child(2)').classList.contains('active'));
+        }
+
+        // Render speakers
+        function renderSpeakers(showFavoritesOnly = false) {
+            const speakerList = document.getElementById('speakerList');
+            const searchTerm = document.getElementById('speakerSearch').value.toLowerCase();
+            const langFilter = document.getElementById('filterLanguage').value;
+            const genderFilter = document.getElementById('filterGender').value;
+
+            let filteredSpeakers = allSpeakers;
+
+            // Apply filters
+            if (searchTerm) {
+                filteredSpeakers = filteredSpeakers.filter(s => 
+                    s.displayName.toLowerCase().includes(searchTerm) ||
+                    s.shortName.toLowerCase().includes(searchTerm) ||
+                    s.locale.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (langFilter) {
+                filteredSpeakers = filteredSpeakers.filter(s => 
+                    s.locale.toLowerCase().startsWith(langFilter.toLowerCase())
+                );
+            }
+
+            if (genderFilter) {
+                filteredSpeakers = filteredSpeakers.filter(s => s.gender === genderFilter);
+            }
+
+            if (showFavoritesOnly) {
+                filteredSpeakers = filteredSpeakers.filter(s => favorites.includes(s.shortName));
+            }
+
+            if (filteredSpeakers.length === 0) {
+                speakerList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No speakers found</p>';
+                return;
+            }
+
+            speakerList.innerHTML = filteredSpeakers.map(speaker => {
+                const isFavorite = favorites.includes(speaker.shortName);
+                const isSelected = document.getElementById('selectedSpeaker').value === speaker.shortName;
+                return `
+                    <div class="speaker-item ${isSelected ? 'selected' : ''}" onclick="selectSpeaker('${speaker.shortName}', this)">
+                        <div class="speaker-info">
+                            <div class="speaker-name">
+                                ${speaker.displayName}
+                                <span class="gender-badge ${speaker.gender}">${speaker.gender}</span>
+                            </div>
+                            <div class="speaker-meta">${speaker.locale} | ${speaker.shortName}</div>
+                        </div>
+                        <div class="speaker-actions" onclick="event.stopPropagation()">
+                            <button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', this)" title="Preview voice">▶</button>
+                            <button class="speaker-btn fav-btn ${isFavorite ? 'favorited' : ''}" onclick="toggleFavorite('${speaker.shortName}', this)" title="Add to favorites">${isFavorite ? '★' : '☆'}</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Select speaker
+        function selectSpeaker(shortName, element) {
+            document.querySelectorAll('.speaker-item').forEach(item => item.classList.remove('selected'));
+            element.classList.add('selected');
+            document.getElementById('selectedSpeaker').value = shortName;
+        }
+
+        // Toggle favorite
+        function toggleFavorite(shortName, btn) {
+            if (favorites.includes(shortName)) {
+                favorites = favorites.filter(f => f !== shortName);
+                btn.textContent = '☆';
+                btn.classList.remove('favorited');
+            } else {
+                favorites.push(shortName);
+                btn.textContent = '★';
+                btn.classList.add('favorited');
+            }
+            localStorage.setItem('speakerFavorites', JSON.stringify(favorites));
+        }
+
+        // Play voice preview (uses browser's speech synthesis as fallback)
+        async function playVoice(shortName, btn) {
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+                if (currentPlayingBtn) {
+                    currentPlayingBtn.textContent = '▶';
+                    currentPlayingBtn.classList.remove('playing');
+                }
+            }
+
+            if (currentPlayingBtn === btn) {
+                currentPlayingBtn = null;
+                return;
+            }
+
+            btn.textContent = '⏹';
+            btn.classList.add('playing');
+            currentPlayingBtn = btn;
+
+            try {
+                // For now, use browser's speech synthesis as a preview
+                // In production, you could call an API endpoint to generate a sample
+                const utterance = new SpeechSynthesisUtterance('Hello! This is a voice preview for short story generation.');
+                utterance.lang = shortName.split('-').slice(0, 2).join('-');
+                utterance.onend = () => {
+                    btn.textContent = '▶';
+                    btn.classList.remove('playing');
+                    currentPlayingBtn = null;
+                };
+                window.speechSynthesis.speak(utterance);
+            } catch (error) {
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+                console.error('Voice preview failed:', error);
             }
         }
 
@@ -699,7 +1011,6 @@
                 showMessage('Story project created! Generation started.', 'success');
                 document.getElementById('storyForm').reset();
                 document.getElementById('selectedSpeaker').value = '';
-                document.getElementById('speakerList').classList.add('hidden');
                 
                 // Switch to projects tab
                 switchTab('projects');
@@ -740,6 +1051,7 @@
                 projects.forEach(project => {
                     const card = document.createElement('div');
                     card.className = 'project-card';
+                    card.id = `project-${project.id}`;
                     
                     const statusClass = project.status.toLowerCase().includes('completed') ? 'completed' :
                                       project.status.toLowerCase().includes('failed') ? 'failed' :
@@ -754,7 +1066,7 @@
                         <p><strong>Scenes:</strong> ${project.totalImages}</p>
                         <p><strong>Image Style:</strong> ${project.imageStyle || 'Default'}</p>
                         <p><strong>Tone:</strong> ${project.narrativeTone || 'Default'}</p>
-                        <span class="status ${statusClass}">${project.status}</span>
+                        <span class="status ${statusClass}" id="status-${project.id}">${project.status}</span>
                         ${project.videoPath ? `<p style="margin-top: 10px;"><a href="${project.videoPath}" target="_blank" style="color: #667eea;">Download Video</a></p>` : ''}
                         <div class="action-buttons">
                             <button class="action-btn logs-btn" onclick="viewLogs('${project.id}')">View Logs</button>
@@ -763,11 +1075,50 @@
                     `;
                     
                     list.appendChild(card);
+                    
+                    // Subscribe to SSE for processing projects
+                    if (statusClass === 'processing') {
+                        subscribeToProjectLogs(project.id);
+                    }
                 });
             } catch (error) {
                 loading.classList.add('hidden');
                 list.innerHTML = '<p style="color: red; text-align: center;">Failed to load projects</p>';
             }
+        }
+
+        // Subscribe to SSE for project logs
+        function subscribeToProjectLogs(projectId) {
+            if (sseConnections.has(projectId)) return;
+            
+            const eventSource = new EventSource(`${API_URL}/stories/${projectId}/logs/stream`);
+            
+            eventSource.onopen = () => {
+                document.getElementById('sseStatus').className = 'sse-status connected';
+            };
+            
+            eventSource.onmessage = (event) => {
+                try {
+                    const log = JSON.parse(event.data);
+                    
+                    // Update project status in the UI
+                    if (log.code === 'COMPLETED' || log.code === 'GENERATION_FAILED') {
+                        loadProjects(); // Reload to get final status
+                        eventSource.close();
+                        sseConnections.delete(projectId);
+                    }
+                } catch (e) {
+                    console.error('SSE parse error:', e);
+                }
+            };
+            
+            eventSource.onerror = () => {
+                document.getElementById('sseStatus').className = 'sse-status disconnected';
+                eventSource.close();
+                sseConnections.delete(projectId);
+            };
+            
+            sseConnections.set(projectId, eventSource);
         }
 
         // View logs for a project
@@ -831,6 +1182,9 @@
                 if (!response.ok) throw new Error('Failed to retry generation');
                 
                 showMessage('Generation retry started!', 'success');
+                
+                // Subscribe to SSE for updates
+                subscribeToProjectLogs(projectId);
                 
                 // Refresh projects after a short delay
                 setTimeout(() => loadProjects(), 2000);
