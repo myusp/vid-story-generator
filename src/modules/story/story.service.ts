@@ -347,8 +347,8 @@ export class StoryService {
         'IMAGE_OUTPUT_DIR',
         './storage/images',
       );
-      const width = project.orientation === 'PORTRAIT' ? 720 : 1280;
-      const height = project.orientation === 'PORTRAIT' ? 1280 : 720;
+      const width = project.orientation === 'PORTRAIT' ? 2160 : 3840;
+      const height = project.orientation === 'PORTRAIT' ? 3840 : 2160;
 
       for (const scene of scenesWithSsml) {
         // Skip if image already generated
