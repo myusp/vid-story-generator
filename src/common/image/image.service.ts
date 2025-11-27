@@ -24,7 +24,7 @@ export class ImageService {
     try {
       // Polinations AI URL format
       const encodedPrompt = encodeURIComponent(prompt);
-      const imageUrl = `${this.baseUrl}/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true`;
+      const imageUrl = `${this.baseUrl}/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&model=flux`;
 
       // Download image
       const response = await axios.get(imageUrl, {
