@@ -1067,7 +1067,12 @@
                         <p><strong>Image Style:</strong> ${project.imageStyle || 'Default'}</p>
                         <p><strong>Tone:</strong> ${project.narrativeTone || 'Default'}</p>
                         <span class="status ${statusClass}" id="status-${project.id}">${project.status}</span>
-                        ${project.videoPath ? `<p style="margin-top: 10px;"><a href="${project.videoPath}" target="_blank" style="color: #667eea;">Download Video</a></p>` : ''}
+                        ${project.videoPath ? `
+                            <div style="margin-top: 10px;">
+                                <a href="${API_URL}/stories/${project.id}/download/video" class="action-btn" style="background: #4caf50; text-decoration: none; display: inline-block; margin-right: 10px;">📥 Download Video</a>
+                                <a href="${API_URL}/stories/${project.id}/download/srt" class="action-btn" style="background: #2196f3; text-decoration: none; display: inline-block;">📝 Download SRT</a>
+                            </div>
+                        ` : ''}
                         <div class="action-buttons">
                             <button class="action-btn logs-btn" onclick="viewLogs('${project.id}')">View Logs</button>
                             ${showRetry ? `<button class="action-btn retry-btn" onclick="retryGeneration('${project.id}')">Retry</button>` : ''}

@@ -278,6 +278,7 @@ export class FfmpegService {
    * Enhanced with more dramatic movement for engaging video content
    * Supports: pan-left, pan-right, pan-up, pan-down, zoom-slow, zoom-in, zoom-out, static
    * All pan effects include subtle zoom for more depth
+   * Animations are designed to be smooth and professional - not too aggressive
    */
   private getKenBurnsFilter(
     animation: string,
@@ -286,57 +287,58 @@ export class FfmpegService {
     const fps = this.VIDEO_FPS;
     const frames = Math.floor(duration * fps);
 
+    // Use easing function for smoother transitions
+    // Reduced zoom levels for less aggressive, more professional movement
     switch (animation) {
       case 'pan-left':
-        // Pan from right to left with 1.3x zoom - more dramatic movement
-        // Starts at right edge, smoothly slides to left edge
-        return `zoompan=z='1.3':x='iw*(1-1/zoom)*(1-on/${frames})':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth pan from right to left with 1.15x zoom (reduced from 1.3x)
+        // Uses smooth interpolation for less jerky movement
+        return `zoompan=z='1.15':x='iw*(1-1/zoom)*(1-on/${frames})':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-right':
-        // Pan from left to right with 1.3x zoom
-        // Starts at left edge, smoothly slides to right edge
-        return `zoompan=z='1.3':x='iw*(1-1/zoom)*on/${frames}':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth pan from left to right with 1.15x zoom
+        return `zoompan=z='1.15':x='iw*(1-1/zoom)*on/${frames}':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-up':
-        // Pan from bottom to top with 1.3x zoom
-        return `zoompan=z='1.3':x='(iw-iw/zoom)/2':y='ih*(1-1/zoom)*(1-on/${frames})':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth pan from bottom to top with 1.15x zoom
+        return `zoompan=z='1.15':x='(iw-iw/zoom)/2':y='ih*(1-1/zoom)*(1-on/${frames})':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-down':
-        // Pan from top to bottom with 1.3x zoom
-        return `zoompan=z='1.3':x='(iw-iw/zoom)/2':y='ih*(1-1/zoom)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth pan from top to bottom with 1.15x zoom
+        return `zoompan=z='1.15':x='(iw-iw/zoom)/2':y='ih*(1-1/zoom)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-diagonal-left':
-        // Diagonal pan from bottom-right to top-left with zoom
-        return `zoompan=z='1.3':x='iw*(1-1/zoom)*(1-on/${frames})':y='ih*(1-1/zoom)*(1-on/${frames})':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Diagonal pan with reduced zoom (1.12x instead of 1.3x)
+        return `zoompan=z='1.12':x='iw*(1-1/zoom)*(1-on/${frames})':y='ih*(1-1/zoom)*(1-on/${frames})':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-diagonal-right':
-        // Diagonal pan from top-left to bottom-right with zoom
-        return `zoompan=z='1.3':x='iw*(1-1/zoom)*on/${frames}':y='ih*(1-1/zoom)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Diagonal pan with reduced zoom
+        return `zoompan=z='1.12':x='iw*(1-1/zoom)*on/${frames}':y='ih*(1-1/zoom)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-slow':
-        // Slow zoom in (1.0 -> 1.2) - subtle but noticeable
-        return `zoompan=z='min(1.0+0.2*on/${frames},1.2)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Very gentle zoom in (1.0 -> 1.1) - subtle and professional
+        return `zoompan=z='min(1.0+0.1*on/${frames},1.1)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-in':
-        // Faster zoom in (1.0 -> 1.4) - dramatic focus
-        return `zoompan=z='min(1.0+0.4*on/${frames},1.4)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Moderate zoom in (1.0 -> 1.2) - noticeable but not aggressive
+        return `zoompan=z='min(1.0+0.2*on/${frames},1.2)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-out':
-        // Zoom out (1.4 -> 1.0) - revealing effect
-        return `zoompan=z='max(1.4-0.4*on/${frames},1.0)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth zoom out (1.2 -> 1.0) - professional reveal
+        return `zoompan=z='max(1.2-0.2*on/${frames},1.0)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-pan-left':
-        // Zoom while panning left - very dynamic
-        return `zoompan=z='1.1+0.2*on/${frames}':x='iw*(1-1/zoom)*(1-on/${frames})':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Combined zoom-pan with gentler movement
+        return `zoompan=z='1.05+0.1*on/${frames}':x='iw*(1-1/zoom)*(1-on/${frames})':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-pan-right':
-        // Zoom while panning right - very dynamic
-        return `zoompan=z='1.1+0.2*on/${frames}':x='iw*(1-1/zoom)*on/${frames}':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Combined zoom-pan with gentler movement
+        return `zoompan=z='1.05+0.1*on/${frames}':x='iw*(1-1/zoom)*on/${frames}':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'static':
       default:
-        // No movement - just display image at center with slight zoom for visual interest
-        return `zoompan=z='1.05':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Slight zoom for visual interest (1.02x - barely noticeable)
+        return `zoompan=z='1.02':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
     }
   }
 

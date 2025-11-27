@@ -21,6 +21,8 @@ model StoryProject {
   modelProvider    String      @default("gemini")
   imageStyle       String?
   narrativeTone    String?
+  projectSlug      String?     // Safe name for file paths (derived from topic)
+  characterDescriptions String? // JSON string containing character descriptions for consistent images
 
   titleGenerated       String?
   descriptionGenerated String?

@@ -6,6 +6,7 @@ import { TtsService } from '../../common/tts/tts.service';
 import { ImageService } from '../../common/image/image.service';
 import { FfmpegService } from '../../common/ffmpeg/ffmpeg.service';
 import { SrtGenerator } from '../../common/utils/srt-generator';
+import { generateSafeSlug } from '../../common/utils/file-naming';
 import { StartStoryDto } from '../../common/dto/start-story.dto';
 import { StoryStatus } from '../../common/enums/story-status.enum';
 import { LogsService } from '../logs/logs.service';
@@ -42,7 +43,52 @@ export class StoryService {
     });
   }
 
+  /**
+   * Generate a unique project slug based on topic
+   */
+  private async generateUniqueSlug(topic: string): Promise<string> {
+    const baseSlug = generateSafeSlug(topic);
+    let slug = baseSlug;
+    let counter = 1;
+
+    // Check if slug exists
+    while (true) {
+      const existing = await this.prisma.storyProject.findFirst({
+        where: { projectSlug: slug },
+      });
+
+      if (!existing) {
+        break;
+      }
+
+      // Add date and/or counter
+      const date = new Date();
+      const dateStr =
+        date.getFullYear().toString() +
+        (date.getMonth() + 1).toString().padStart(2, '0') +
+        date.getDate().toString().padStart(2, '0');
+
+      if (counter === 1) {
+        slug = `${baseSlug}_${dateStr}`;
+      } else {
+        slug = `${baseSlug}_${dateStr}_${counter}`;
+      }
+      counter++;
+
+      // Safety limit
+      if (counter > 100) {
+        slug = `${baseSlug}_${Date.now()}`;
+        break;
+      }
+    }
+
+    return slug;
+  }
+
   async startProject(dto: StartStoryDto) {
+    // Generate unique project slug from topic
+    const projectSlug = await this.generateUniqueSlug(dto.topic);
+
     const project = await this.prisma.storyProject.create({
       data: {
         topic: dto.topic,
@@ -54,6 +100,7 @@ export class StoryService {
         modelProvider: dto.modelProvider,
         imageStyle: dto.imageStyle,
         narrativeTone: dto.narrativeTone,
+        projectSlug,
         status: StoryStatus.PENDING,
       },
     });
@@ -62,7 +109,7 @@ export class StoryService {
       project.id,
       'INFO',
       'PROJECT_STARTED',
-      'Project created successfully',
+      `Project created with slug: ${projectSlug}`,
     );
 
     return project;
@@ -114,6 +161,9 @@ export class StoryService {
         orderBy: { order: 'asc' },
       });
 
+      // Use projectSlug for file naming if available, fallback to projectId
+      const filePrefix = project.projectSlug || projectId;
+
       if (existingScenes.length === 0 || !existingScenes[0].narration) {
         await this.logMessage(
           projectId,
@@ -147,6 +197,36 @@ export class StoryService {
         }
       }
 
+      // Step 2.5: Generate character descriptions if not already done
+      let characterDescriptions = project.characterDescriptions;
+      if (!characterDescriptions) {
+        await this.logMessage(
+          projectId,
+          'INFO',
+          'GENERATING_CHARACTERS',
+          'Generating character descriptions for consistent imagery...',
+        );
+
+        const allScenes = await this.prisma.storyScene.findMany({
+          where: { projectId },
+          orderBy: { order: 'asc' },
+        });
+        const allNarrations = allScenes.map((s) => s.narration).join('\n');
+
+        characterDescriptions =
+          await this.aiService.generateCharacterDescriptions(
+            project.topic,
+            allNarrations,
+            project.imageStyle || '',
+            provider,
+          );
+
+        await this.prisma.storyProject.update({
+          where: { id: projectId },
+          data: { characterDescriptions },
+        });
+      }
+
       // Step 3: Generate image prompts in batches (skip if already generated)
       const dbScenes = await this.prisma.storyScene.findMany({
         where: { projectId },
@@ -162,7 +242,7 @@ export class StoryService {
           `Generating image prompts in batches (${scenesWithoutImagePrompts.length} remaining)...`,
         );
 
-        // Use batch processing for image prompts
+        // Use batch processing for image prompts with character descriptions
         const imagePromptBatch = await this.aiService.generateImagePromptsBatch(
           scenesWithoutImagePrompts.map((s) => ({
             order: s.order,
@@ -170,6 +250,7 @@ export class StoryService {
           })),
           project.imageStyle || '',
           provider,
+          characterDescriptions, // Pass character descriptions for consistency
         );
 
         // Update scenes with image prompts
@@ -270,9 +351,13 @@ export class StoryService {
       const height = project.orientation === 'PORTRAIT' ? 1280 : 720;
 
       for (const scene of scenesWithSsml) {
+        // Skip if image already generated
+        if (scene.imagePath && fs.existsSync(scene.imagePath)) {
+          continue;
+        }
         const imagePath = path.join(
           imageDir,
-          `${projectId}_scene_${scene.order}.jpg`,
+          `${filePrefix}_scene_${scene.order}.jpg`,
         );
         await this.imageService.generateImage(
           scene.imagePrompt,
@@ -310,9 +395,14 @@ export class StoryService {
       });
 
       for (const scene of scenesWithImages) {
+        // Skip if audio already generated
+        if (scene.audioPath && fs.existsSync(scene.audioPath)) {
+          currentTime = scene.endTimeMs || currentTime;
+          continue;
+        }
         const audioPath = path.join(
           audioDir,
-          `${projectId}_scene_${scene.order}.mp3`,
+          `${filePrefix}_scene_${scene.order}.mp3`,
         );
 
         let result;
@@ -388,7 +478,7 @@ export class StoryService {
       for (const scene of updatedScenes) {
         const sceneVideoPath = path.join(
           tmpDir,
-          `${projectId}_scene_${scene.order}.mp4`,
+          `${filePrefix}_scene_${scene.order}.mp4`,
         );
 
         // Pass animation data to ffmpeg service
@@ -405,7 +495,7 @@ export class StoryService {
         sceneVideos.push(sceneVideoPath);
       }
 
-      const finalVideoPath = path.join(videoOutputDir, `${projectId}.mp4`);
+      const finalVideoPath = path.join(videoOutputDir, `${filePrefix}.mp4`);
       await this.ffmpegService.concatenateVideos(sceneVideos, finalVideoPath);
 
       // Cleanup temp files
@@ -420,7 +510,7 @@ export class StoryService {
         'SRT_OUTPUT_DIR',
         './storage/subtitles',
       );
-      const srtPath = path.join(srtOutputDir, `${projectId}.srt`);
+      const srtPath = path.join(srtOutputDir, `${filePrefix}.srt`);
 
       const subtitles = updatedScenes.map((scene, index) => ({
         index: index + 1,

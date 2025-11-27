@@ -7,6 +7,8 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,8 +16,11 @@ import {
   ApiResponse,
   ApiSecurity,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { StoryService } from './story.service';
 import { StartStoryDto } from '../../common/dto/start-story.dto';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @ApiTags('stories')
 @ApiSecurity('api-key')
@@ -97,5 +102,79 @@ export class StoryController {
       throw new NotFoundException('Project not found');
     }
     return project;
+  }
+
+  @Get(':id/download/video')
+  @ApiOperation({ summary: 'Download project video' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the video file',
+  })
+  async downloadVideo(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const project = await this.storyService.getProject(id);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!project.videoPath || !fs.existsSync(project.videoPath)) {
+      throw new NotFoundException('Video not found');
+    }
+
+    // Security: Validate the file is in the expected storage directory
+    const resolvedPath = path.resolve(project.videoPath);
+    const storageDir = path.resolve('./storage/videos');
+    if (!resolvedPath.startsWith(storageDir)) {
+      throw new NotFoundException('Video not found');
+    }
+
+    const fileName = path.basename(project.videoPath);
+    const file = fs.createReadStream(project.videoPath);
+
+    res.set({
+      'Content-Type': 'video/mp4',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    });
+
+    return new StreamableFile(file);
+  }
+
+  @Get(':id/download/srt')
+  @ApiOperation({ summary: 'Download project subtitles' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the SRT file',
+  })
+  async downloadSrt(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const project = await this.storyService.getProject(id);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!project.srtPath || !fs.existsSync(project.srtPath)) {
+      throw new NotFoundException('Subtitles not found');
+    }
+
+    // Security: Validate the file is in the expected storage directory
+    const resolvedPath = path.resolve(project.srtPath);
+    const storageDir = path.resolve('./storage/subtitles');
+    if (!resolvedPath.startsWith(storageDir)) {
+      throw new NotFoundException('Subtitles not found');
+    }
+
+    const fileName = path.basename(project.srtPath);
+    const file = fs.createReadStream(project.srtPath);
+
+    res.set({
+      'Content-Type': 'text/plain',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    });
+
+    return new StreamableFile(file);
   }
 }

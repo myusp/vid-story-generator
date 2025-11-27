@@ -140,12 +140,51 @@ Create exactly ${totalScenes} narrations.`;
   }
 
   /**
+   * Generate character descriptions for consistent imagery across all scenes
+   */
+  async generateCharacterDescriptions(
+    topic: string,
+    allNarrations: string,
+    imageStyle: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<string> {
+    const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
+    const prompt = `Based on this story topic and narrations, identify and describe ALL characters that appear in the story.
+
+Topic: ${topic}
+
+Narrations:
+${allNarrations}
+
+For each character, provide a detailed, consistent visual description${styleDescription} that can be used for AI image generation.
+
+Include:
+- Physical appearance (age, height, build, hair, eyes, skin tone)
+- Clothing/outfit (be specific and consistent)
+- Distinctive features or accessories
+- Personality-based visual cues (posture, expression tendency)
+
+Return ONLY a JSON object with character names as keys:
+{
+  "Main Character Name": "Detailed visual description for consistent imagery...",
+  "Another Character": "Their detailed visual description..."
+}
+
+Note: Use consistent naming (e.g., if narration says "Ayah", describe as "Ayah (Father)" or just "Father").
+The descriptions should be detailed enough to generate consistent images across multiple scenes.`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    return response;
+  }
+
+  /**
    * Step 2: Generate image prompts in batches
    */
   async generateImagePromptsBatch(
     narrations: Array<{ order: number; narration: string }>,
     imageStyle: string,
     provider: 'gemini' | 'openai',
+    characterDescriptions?: string,
   ): Promise<ImagePromptData[]> {
     const results: ImagePromptData[] = [];
 
@@ -161,6 +200,7 @@ Create exactly ${totalScenes} narrations.`;
           batch,
           imageStyle,
           provider,
+          characterDescriptions,
         );
 
         // Create a map for O(1) lookups
@@ -180,6 +220,7 @@ Create exactly ${totalScenes} narrations.`;
               narration.narration,
               imageStyle,
               provider,
+              characterDescriptions,
             );
             results.push({
               order: narration.order,
@@ -197,6 +238,7 @@ Create exactly ${totalScenes} narrations.`;
             narration.narration,
             imageStyle,
             provider,
+            characterDescriptions,
           );
           results.push({
             order: narration.order,
@@ -213,24 +255,33 @@ Create exactly ${totalScenes} narrations.`;
     narrations: Array<{ order: number; narration: string }>,
     imageStyle: string,
     provider: 'gemini' | 'openai',
+    characterDescriptions?: string,
   ): Promise<ImagePromptData[]> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
     const narrationsText = narrations
       .map((n) => `Scene ${n.order}: "${n.narration}"`)
       .join('\n');
 
-    const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
+    // Include character descriptions if available for consistent imagery
+    const characterContext = characterDescriptions
+      ? `\n\nCHARACTER DESCRIPTIONS (use these for consistent character appearances):\n${characterDescriptions}\n`
+      : '';
 
+    const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
+${characterContext}
 ${narrationsText}
 
 For EACH scene listed above, create a prompt that includes:
-- Main subject/characters
+- Main subject/characters (use the character descriptions above for consistency if they appear in the scene)
 - Setting/environment
 - Mood/atmosphere
 - Visual details
 - Composition
 
-IMPORTANT: You MUST return a result for EACH scene with the EXACT order number specified above.
+IMPORTANT: 
+1. You MUST return a result for EACH scene with the EXACT order number specified above.
+2. If a character from the character descriptions appears in the scene, use their exact visual description.
+3. Keep character appearances consistent across all scenes.
 
 Return ONLY a JSON array in this exact format (one entry for EACH scene):
 [
@@ -258,14 +309,19 @@ Generate exactly ${narrations.length} results, one for each scene.`;
     narration: string,
     imageStyle: string,
     provider: 'gemini' | 'openai',
+    characterDescriptions?: string,
   ): Promise<string> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
-    const prompt = `Based on this narration: "${narration}"
+    const characterContext = characterDescriptions
+      ? `\n\nCHARACTER DESCRIPTIONS (use these for consistent character appearances):\n${characterDescriptions}\n`
+      : '';
 
+    const prompt = `Based on this narration: "${narration}"
+${characterContext}
 Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
 
 The prompt should be in English and describe:
-- Main subject/characters
+- Main subject/characters (use the character descriptions above if they appear in this scene)
 - Setting/environment
 - Mood/atmosphere
 - Visual details
