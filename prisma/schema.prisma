@@ -23,11 +23,13 @@ model StoryProject {
   narrativeTone    String?
   projectSlug      String?     // Safe name for file paths (derived from topic)
   characterDescriptions String? // JSON string containing character descriptions for consistent images
+  storyMode        String?     // 'topic', 'prompt', or 'narrations'
+  storyPrompt      String?     // User-provided story prompt
+  allowedAnimations String?    // JSON array of allowed animation types
 
   titleGenerated       String?
   descriptionGenerated String?
   hashtagsGenerated    String?
-  storyPrompt          String?
   rawStory             String?
 
   videoPath        String?

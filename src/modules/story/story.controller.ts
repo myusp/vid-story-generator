@@ -19,6 +19,7 @@ import {
 import { Response } from 'express';
 import { StoryService } from './story.service';
 import { StartStoryDto } from '../../common/dto/start-story.dto';
+import { Public } from '../../common/guards/public.decorator';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -104,6 +105,7 @@ export class StoryController {
     return project;
   }
 
+  @Public()
   @Get(':id/download/video')
   @ApiOperation({ summary: 'Download project video' })
   @ApiResponse({
@@ -141,6 +143,7 @@ export class StoryController {
     return new StreamableFile(file);
   }
 
+  @Public()
   @Get(':id/download/srt')
   @ApiOperation({ summary: 'Download project subtitles' })
   @ApiResponse({

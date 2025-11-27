@@ -520,6 +520,24 @@
             background: #f44336;
         }
 
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -575,9 +593,35 @@
             <h2>Create New Story</h2>
             
             <form id="storyForm" onsubmit="createStory(event)">
+                <!-- Story Mode Selection -->
                 <div class="form-group">
+                    <label for="storyMode">Story Creation Mode</label>
+                    <select id="storyMode" onchange="updateStoryModeUI()">
+                        <option value="topic">Generate from Topic</option>
+                        <option value="prompt">Generate from Story Prompt</option>
+                        <option value="narrations">Use Existing Narrations</option>
+                    </select>
+                </div>
+
+                <!-- Topic Input (for topic mode) -->
+                <div class="form-group" id="topicGroup">
                     <label for="topic">Topic *</label>
-                    <input type="text" id="topic" required placeholder="e.g., Ayah kurang tidur">
+                    <input type="text" id="topic" placeholder="e.g., Ayah kurang tidur">
+                </div>
+
+                <!-- Story Prompt Input (for prompt mode) -->
+                <div class="form-group hidden" id="storyPromptGroup">
+                    <label for="storyPromptText">Story Prompt *</label>
+                    <textarea id="storyPromptText" rows="4" placeholder="Describe the story you want to create. AI will generate narrations based on your prompt."></textarea>
+                </div>
+
+                <!-- Existing Narrations (for narrations mode) -->
+                <div class="form-group hidden" id="narrationsGroup">
+                    <label for="existingNarrations">Existing Narrations * (one per line)</label>
+                    <textarea id="existingNarrations" rows="8" placeholder="Scene 1: First narration here...
+Scene 2: Second narration here...
+Scene 3: Third narration here..."></textarea>
+                    <small style="color: #666;">Enter one narration per line. Each line becomes a scene.</small>
                 </div>
 
                 <div class="form-row">
@@ -685,6 +729,27 @@
                     </div>
                 </div>
 
+                <!-- Animation Options (Collapsible) -->
+                <div class="form-group">
+                    <label onclick="toggleAnimationOptions()" style="cursor: pointer;">
+                        🎬 Animation Options <span id="animationToggle">(click to expand)</span>
+                    </label>
+                    <div id="animationOptions" class="hidden" style="margin-top: 10px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                        <p style="margin-bottom: 10px; font-size: 13px; color: #666;">Select which animations are allowed (leave empty for all):</p>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-left"> Pan Left</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-right"> Pan Right</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-up"> Pan Up</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-down"> Pan Down</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-slow"> Zoom Slow</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-in"> Zoom In</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-out"> Zoom Out</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="static"> Static</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="fade"> Fade</label>
+                        </div>
+                    </div>
+                </div>
+
                 <button type="submit" id="submitBtn">Create Story</button>
             </form>
         </div>
@@ -714,6 +779,22 @@
                 <div class="loading">
                     <div class="spinner"></div>
                     <p>Loading logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>📋 Project Details</h2>
+                <span class="close-modal" onclick="closeDetailsModal()">&times;</span>
+            </div>
+            <div id="detailsContent">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading details...</p>
                 </div>
             </div>
         </div>
@@ -967,17 +1048,56 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating...';
 
+            const storyMode = document.getElementById('storyMode').value;
+            
+            // Build data based on story mode
             const data = {
-                topic: document.getElementById('topic').value,
+                storyMode,
                 genre: document.getElementById('genre').value,
                 language: document.getElementById('language').value,
                 speaker: document.getElementById('selectedSpeaker').value,
                 orientation: document.getElementById('orientation').value,
-                totalImages: parseInt(document.getElementById('totalImages').value),
                 modelProvider: document.getElementById('modelProvider').value,
                 imageStyle: document.getElementById("imageStyle").value || null,
                 narrativeTone: document.getElementById("narrativeTone").value || null,
             };
+
+            // Handle different story modes
+            if (storyMode === 'topic') {
+                data.topic = document.getElementById('topic').value;
+                data.totalImages = parseInt(document.getElementById('totalImages').value);
+                if (!data.topic) {
+                    showMessage('Please enter a topic', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Story';
+                    return;
+                }
+            } else if (storyMode === 'prompt') {
+                data.storyPrompt = document.getElementById('storyPromptText').value;
+                data.totalImages = parseInt(document.getElementById('totalImages').value);
+                if (!data.storyPrompt) {
+                    showMessage('Please enter a story prompt', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Story';
+                    return;
+                }
+            } else if (storyMode === 'narrations') {
+                const narrationsText = document.getElementById('existingNarrations').value;
+                const narrations = narrationsText.split('\n').filter(line => line.trim());
+                if (narrations.length < 2) {
+                    showMessage('Please enter at least 2 narrations (one per line)', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Story';
+                    return;
+                }
+                data.existingNarrations = narrations;
+            }
+
+            // Get allowed animations if any are selected
+            const animationCheckboxes = document.querySelectorAll('input[name="allowedAnimations"]:checked');
+            if (animationCheckboxes.length > 0) {
+                data.allowedAnimations = Array.from(animationCheckboxes).map(cb => cb.value);
+            }
 
             if (!data.speaker) {
                 showMessage('Please select a speaker', 'error');
@@ -1011,6 +1131,7 @@
                 showMessage('Story project created! Generation started.', 'success');
                 document.getElementById('storyForm').reset();
                 document.getElementById('selectedSpeaker').value = '';
+                updateStoryModeUI(); // Reset UI
                 
                 // Switch to projects tab
                 switchTab('projects');
@@ -1074,6 +1195,7 @@
                             </div>
                         ` : ''}
                         <div class="action-buttons">
+                            <button class="action-btn" style="background: #9c27b0;" onclick="viewDetails('${project.id}')">📋 Details</button>
                             <button class="action-btn logs-btn" onclick="viewLogs('${project.id}')">View Logs</button>
                             ${showRetry ? `<button class="action-btn retry-btn" onclick="retryGeneration('${project.id}')">Retry</button>` : ''}
                         </div>
@@ -1198,11 +1320,159 @@
             }
         }
 
+        // View project details
+        async function viewDetails(projectId) {
+            const modal = document.getElementById('detailsModal');
+            const content = document.getElementById('detailsContent');
+            
+            modal.style.display = 'block';
+            content.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading details...</p></div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/stories/${projectId}`, {
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load details');
+                
+                const project = await response.json();
+                
+                // Format character descriptions
+                let characterHtml = '<em>Not generated yet</em>';
+                if (project.characterDescriptions) {
+                    try {
+                        const chars = JSON.parse(project.characterDescriptions);
+                        characterHtml = Object.entries(chars).map(([name, desc]) => 
+                            `<div style="margin-bottom: 10px;"><strong>${name}:</strong> ${desc}</div>`
+                        ).join('');
+                    } catch {
+                        characterHtml = project.characterDescriptions.substring(0, 500) + '...';
+                    }
+                }
+
+                // Format scenes
+                let scenesHtml = '<em>No scenes yet</em>';
+                if (project.scenes && project.scenes.length > 0) {
+                    scenesHtml = project.scenes.map(scene => `
+                        <div style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 8px;">
+                            <strong>Scene ${scene.order}:</strong>
+                            <p style="margin: 5px 0;">${scene.narration || '<em>No narration</em>'}</p>
+                            ${scene.imagePrompt ? `<small style="color: #666;"><strong>Image Prompt:</strong> ${scene.imagePrompt.substring(0, 100)}...</small>` : ''}
+                            ${scene.animationShow ? `<br><small style="color: #667eea;"><strong>Animation:</strong> ${scene.animationShow}</small>` : ''}
+                        </div>
+                    `).join('');
+                }
+                
+                content.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h3 style="color: #667eea; margin-bottom: 15px;">📌 Basic Info</h3>
+                            <p><strong>ID:</strong> ${project.id}</p>
+                            <p><strong>Slug:</strong> ${project.projectSlug || 'N/A'}</p>
+                            <p><strong>Topic:</strong> ${project.topic}</p>
+                            <p><strong>Genre:</strong> ${project.genre}</p>
+                            <p><strong>Language:</strong> ${project.language}</p>
+                            <p><strong>Speaker:</strong> ${project.speakerCode}</p>
+                            <p><strong>Orientation:</strong> ${project.orientation}</p>
+                            <p><strong>Total Images:</strong> ${project.totalImages}</p>
+                            <p><strong>Status:</strong> <span class="status ${project.status.toLowerCase()}">${project.status}</span></p>
+                            <p><strong>Created:</strong> ${new Date(project.createdAt).toLocaleString()}</p>
+                            <p><strong>Updated:</strong> ${new Date(project.updatedAt).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <h3 style="color: #667eea; margin-bottom: 15px;">🎨 Style Settings</h3>
+                            <p><strong>Image Style:</strong> ${project.imageStyle || 'Default'}</p>
+                            <p><strong>Narrative Tone:</strong> ${project.narrativeTone || 'Default'}</p>
+                            <p><strong>AI Model:</strong> ${project.modelProvider || 'gemini'}</p>
+                            <p><strong>Story Mode:</strong> ${project.storyMode || 'topic'}</p>
+                            ${project.storyPrompt ? `<p><strong>Story Prompt:</strong> ${project.storyPrompt.substring(0, 200)}${project.storyPrompt.length > 200 ? '...' : ''}</p>` : ''}
+                            ${project.allowedAnimations ? `<p><strong>Allowed Animations:</strong> ${project.allowedAnimations}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">📝 Generated Content</h3>
+                    <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <p><strong>Title:</strong> ${project.titleGenerated || '<em>Not generated</em>'}</p>
+                        <p><strong>Description:</strong> ${project.descriptionGenerated || '<em>Not generated</em>'}</p>
+                        <p><strong>Hashtags:</strong> ${project.hashtagsGenerated || '<em>Not generated</em>'}</p>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">👥 Characters</h3>
+                    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
+                        ${characterHtml}
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">🎬 Scenes (${project.scenes?.length || 0})</h3>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        ${scenesHtml}
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">📁 Files</h3>
+                    <div style="background: #fff3e0; padding: 15px; border-radius: 8px;">
+                        <p><strong>Video:</strong> ${project.videoPath || '<em>Not generated</em>'}</p>
+                        <p><strong>Subtitles:</strong> ${project.srtPath || '<em>Not generated</em>'}</p>
+                    </div>
+                `;
+            } catch (error) {
+                content.innerHTML = '<p style="color: red; text-align: center;">Failed to load project details</p>';
+            }
+        }
+
+        // Close details modal
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        // Toggle animation options visibility
+        function toggleAnimationOptions() {
+            const options = document.getElementById('animationOptions');
+            const toggle = document.getElementById('animationToggle');
+            if (options.classList.contains('hidden')) {
+                options.classList.remove('hidden');
+                toggle.textContent = '(click to collapse)';
+            } else {
+                options.classList.add('hidden');
+                toggle.textContent = '(click to expand)';
+            }
+        }
+
+        // Update UI based on story mode selection
+        function updateStoryModeUI() {
+            const mode = document.getElementById('storyMode').value;
+            const topicGroup = document.getElementById('topicGroup');
+            const storyPromptGroup = document.getElementById('storyPromptGroup');
+            const narrationsGroup = document.getElementById('narrationsGroup');
+            const totalImagesGroup = document.getElementById('totalImages').parentElement;
+
+            // Hide all
+            topicGroup.classList.add('hidden');
+            storyPromptGroup.classList.add('hidden');
+            narrationsGroup.classList.add('hidden');
+
+            // Show based on mode
+            if (mode === 'topic') {
+                topicGroup.classList.remove('hidden');
+                totalImagesGroup.style.display = 'block';
+            } else if (mode === 'prompt') {
+                storyPromptGroup.classList.remove('hidden');
+                totalImagesGroup.style.display = 'block';
+            } else if (mode === 'narrations') {
+                narrationsGroup.classList.remove('hidden');
+                totalImagesGroup.style.display = 'none'; // Auto-calculated from narrations
+            }
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('logsModal');
-            if (event.target === modal) {
+            const logsModal = document.getElementById('logsModal');
+            const detailsModal = document.getElementById('detailsModal');
+            if (event.target === logsModal) {
                 closeLogsModal();
+            }
+            if (event.target === detailsModal) {
+                closeDetailsModal();
             }
         }
 

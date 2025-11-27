@@ -86,30 +86,68 @@ export class StoryService {
   }
 
   async startProject(dto: StartStoryDto) {
+    // Determine topic from story mode
+    const storyMode = dto.storyMode || 'topic';
+    let topic = dto.topic || '';
+    let totalImages = dto.totalImages || 8;
+
+    // Handle different story modes
+    if (storyMode === 'narrations' && dto.existingNarrations?.length) {
+      totalImages = dto.existingNarrations.length;
+      topic =
+        dto.storyPrompt ||
+        dto.existingNarrations[0].substring(0, 50) ||
+        'Custom Story';
+    } else if (storyMode === 'prompt' && dto.storyPrompt) {
+      topic = dto.storyPrompt.substring(0, 50);
+    }
+
+    if (!topic) {
+      topic = 'Untitled Story';
+    }
+
     // Generate unique project slug from topic
-    const projectSlug = await this.generateUniqueSlug(dto.topic);
+    const projectSlug = await this.generateUniqueSlug(topic);
 
     const project = await this.prisma.storyProject.create({
       data: {
-        topic: dto.topic,
+        topic,
         genre: dto.genre,
         language: dto.language,
         speakerCode: dto.speaker,
         orientation: dto.orientation,
-        totalImages: dto.totalImages,
+        totalImages,
         modelProvider: dto.modelProvider,
         imageStyle: dto.imageStyle,
         narrativeTone: dto.narrativeTone,
         projectSlug,
+        storyMode,
+        storyPrompt: dto.storyPrompt,
+        allowedAnimations: dto.allowedAnimations?.length
+          ? JSON.stringify(dto.allowedAnimations)
+          : null,
         status: StoryStatus.PENDING,
       },
     });
+
+    // If using existing narrations, create scenes immediately
+    if (storyMode === 'narrations' && dto.existingNarrations?.length) {
+      for (let i = 0; i < dto.existingNarrations.length; i++) {
+        await this.prisma.storyScene.create({
+          data: {
+            projectId: project.id,
+            order: i + 1,
+            narration: dto.existingNarrations[i],
+          },
+        });
+      }
+    }
 
     await this.logMessage(
       project.id,
       'INFO',
       'PROJECT_STARTED',
-      `Project created with slug: ${projectSlug}`,
+      `Project created with slug: ${projectSlug}, mode: ${storyMode}`,
     );
 
     return project;
@@ -155,7 +193,7 @@ export class StoryService {
         });
       }
 
-      // Step 2: Generate narrations only (skip if scenes exist with narrations)
+      // Step 2: Generate narrations only (skip if scenes exist with narrations or using existing narrations)
       const existingScenes = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
@@ -164,26 +202,44 @@ export class StoryService {
       // Use projectSlug for file naming if available, fallback to projectId
       const filePrefix = project.projectSlug || projectId;
 
+      // Skip narration generation if using 'narrations' mode (already created) or scenes already exist
+      const storyMode = project.storyMode || 'topic';
       if (existingScenes.length === 0 || !existingScenes[0].narration) {
         await this.logMessage(
           projectId,
           'INFO',
           'GENERATING_NARRATIONS',
-          'Generating scene narrations...',
+          `Generating scene narrations (mode: ${storyMode})...`,
         );
         await this.prisma.storyProject.update({
           where: { id: projectId },
           data: { status: StoryStatus.GENERATING_SCENES },
         });
 
-        const narrations = await this.aiService.generateNarrations(
-          project.topic,
-          project.genre,
-          project.language,
-          project.totalImages,
-          project.narrativeTone || '',
-          provider,
-        );
+        // Generate narrations based on mode
+        let narrations: { order: number; narration: string }[];
+
+        if (storyMode === 'prompt' && project.storyPrompt) {
+          // Use story prompt to generate narrations
+          narrations = await this.aiService.generateNarrationsFromPrompt(
+            project.storyPrompt,
+            project.genre,
+            project.language,
+            project.totalImages,
+            project.narrativeTone || '',
+            provider,
+          );
+        } else {
+          // Default: generate from topic
+          narrations = await this.aiService.generateNarrations(
+            project.topic,
+            project.genre,
+            project.language,
+            project.totalImages,
+            project.narrativeTone || '',
+            provider,
+          );
+        }
 
         // Create initial scenes with narrations only
         for (const narration of narrations) {

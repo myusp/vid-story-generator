@@ -140,6 +140,50 @@ Create exactly ${totalScenes} narrations.`;
   }
 
   /**
+   * Generate narrations from a story prompt (user provides the plot outline)
+   */
+  async generateNarrationsFromPrompt(
+    storyPrompt: string,
+    genre: string,
+    language: string,
+    totalScenes: number,
+    narrativeTone: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<NarrationOnly[]> {
+    const toneDescription = narrativeTone
+      ? ` with a ${narrativeTone} tone`
+      : '';
+    const prompt = `Create narrations for a ${totalScenes}-scene short video based on this story outline:
+
+"${storyPrompt}"
+
+Genre: ${genre}
+Language: ${language}
+Style: ${toneDescription}
+
+Generate ONLY the narration text for each scene. Each narration should be a single paragraph that flows naturally when spoken.
+Make it engaging and suitable for shorts format.
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "narration": "narration text in ${language}"
+  }
+]
+
+Create exactly ${totalScenes} narrations that tell the complete story.`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const narrations = JSON.parse(this.extractJSON(response));
+
+    return narrations.map((item: any, index: number) => ({
+      order: item.order || index + 1,
+      narration: item.narration,
+    }));
+  }
+
+  /**
    * Generate character descriptions for consistent imagery across all scenes
    */
   async generateCharacterDescriptions(
