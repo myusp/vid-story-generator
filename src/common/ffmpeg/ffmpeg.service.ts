@@ -100,6 +100,10 @@ export class FfmpegService {
 
   /**
    * Build FFmpeg complex filter for animations
+   * Supports:
+   * - animationIn: fade, slide-left, slide-right, slide-up, slide-down, zoom-in, zoom-out, none
+   * - animationShow: pan-left, pan-right, pan-up, pan-down, zoom-slow, zoom-in, zoom-out, static
+   * - animationOut: fade, slide-left, slide-right, slide-up, slide-down, zoom-in, zoom-out, none
    */
   private buildAnimationFilters(
     animations:
@@ -112,10 +116,13 @@ export class FfmpegService {
     duration: number,
   ): string {
     const filters: string[] = [];
+    const fps = this.VIDEO_FPS;
+    const totalFrames = Math.floor(duration * fps);
+    const transitionFrames = Math.floor(0.5 * fps); // 0.5 seconds for transitions
 
-    // Scale and pad image to proper size (1080x1920 for portrait)
+    // Scale and pad image to proper size (1080x1920 for portrait), ensure we have enough frames
     filters.push(
-      '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2[scaled]',
+      `[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,fps=${fps}[scaled]`,
     );
 
     if (
@@ -124,54 +131,152 @@ export class FfmpegService {
         !animations.animationShow &&
         !animations.animationOut)
     ) {
-      // No animations - just return scaled video
+      // No animations - just return scaled video with proper timing
       filters.push('[scaled]setpts=PTS-STARTPTS[v]');
       return filters.join(';');
     }
 
-    // Calculate transition timings
-    const fadeInDuration = 0.5; // 0.5 seconds for fade in
-    const fadeOutDuration = 0.5; // 0.5 seconds for fade out
-
     let currentFilter = 'scaled';
+    let filterIndex = 0;
 
     // Apply Ken Burns / pan/zoom animation during main show
-    if (animations.animationShow) {
+    if (
+      animations.animationShow &&
+      animations.animationShow !== 'none' &&
+      animations.animationShow !== 'static'
+    ) {
       const kenBurnsFilter = this.getKenBurnsFilter(
         animations.animationShow,
         duration,
       );
       if (kenBurnsFilter) {
-        filters.push(`[${currentFilter}]${kenBurnsFilter}[kenburns]`);
-        currentFilter = 'kenburns';
+        filterIndex++;
+        filters.push(`[${currentFilter}]${kenBurnsFilter}[kb${filterIndex}]`);
+        currentFilter = `kb${filterIndex}`;
       }
     }
 
-    // Apply entrance animation (fade)
-    if (animations.animationIn === 'fade') {
-      filters.push(
-        `[${currentFilter}]fade=t=in:st=0:d=${fadeInDuration}[fadein]`,
-      );
-      currentFilter = 'fadein';
+    // Apply entrance animation
+    if (animations.animationIn && animations.animationIn !== 'none') {
+      filterIndex++;
+      const filterName = `in${filterIndex}`;
+
+      if (animations.animationIn === 'fade') {
+        // Fade in
+        filters.push(`[${currentFilter}]fade=t=in:st=0:d=0.5[${filterName}]`);
+        currentFilter = filterName;
+      } else if (animations.animationIn.startsWith('slide-')) {
+        // Slide entrance using crop/overlay technique
+        const slideFilter = this.getSlideEntranceFilter(
+          animations.animationIn,
+          transitionFrames,
+        );
+        if (slideFilter) {
+          filters.push(`[${currentFilter}]${slideFilter}[${filterName}]`);
+          currentFilter = filterName;
+        }
+      } else if (animations.animationIn === 'zoom-in') {
+        // Zoom in entrance (start small, end normal)
+        filters.push(
+          `[${currentFilter}]scale=iw*if(lt(n,${transitionFrames}),0.7+0.3*n/${transitionFrames},1):ih*if(lt(n,${transitionFrames}),0.7+0.3*n/${transitionFrames},1),pad=1080:1920:(ow-iw)/2:(oh-ih)/2[${filterName}]`,
+        );
+        currentFilter = filterName;
+      } else if (animations.animationIn === 'zoom-out') {
+        // Zoom out entrance (start large, end normal)
+        filters.push(
+          `[${currentFilter}]scale=iw*if(lt(n,${transitionFrames}),1.3-0.3*n/${transitionFrames},1):ih*if(lt(n,${transitionFrames}),1.3-0.3*n/${transitionFrames},1),pad=1080:1920:(ow-iw)/2:(oh-ih)/2[${filterName}]`,
+        );
+        currentFilter = filterName;
+      }
     }
 
-    // Apply exit animation (fade)
-    if (animations.animationOut === 'fade') {
-      const fadeOutStart = duration - fadeOutDuration;
-      filters.push(
-        `[${currentFilter}]fade=t=out:st=${fadeOutStart}:d=${fadeOutDuration}[fadeout]`,
-      );
-      currentFilter = 'fadeout';
+    // Apply exit animation
+    if (animations.animationOut && animations.animationOut !== 'none') {
+      filterIndex++;
+      const filterName = `out${filterIndex}`;
+      const exitStart = Math.max(0, duration - 0.5);
+
+      if (animations.animationOut === 'fade') {
+        // Fade out
+        filters.push(
+          `[${currentFilter}]fade=t=out:st=${exitStart}:d=0.5[${filterName}]`,
+        );
+        currentFilter = filterName;
+      } else if (animations.animationOut.startsWith('slide-')) {
+        // Slide exit
+        const slideFilter = this.getSlideExitFilter(
+          animations.animationOut,
+          totalFrames,
+          transitionFrames,
+        );
+        if (slideFilter) {
+          filters.push(`[${currentFilter}]${slideFilter}[${filterName}]`);
+          currentFilter = filterName;
+        }
+      } else if (animations.animationOut === 'zoom-in') {
+        // Zoom in exit (normal to large, often with fade)
+        filters.push(
+          `[${currentFilter}]fade=t=out:st=${exitStart}:d=0.5[${filterName}]`,
+        );
+        currentFilter = filterName;
+      } else if (animations.animationOut === 'zoom-out') {
+        // Zoom out exit (normal to small, often with fade)
+        filters.push(
+          `[${currentFilter}]fade=t=out:st=${exitStart}:d=0.5[${filterName}]`,
+        );
+        currentFilter = filterName;
+      }
     }
 
-    // Final setpts
+    // Final setpts to reset timestamps
     filters.push(`[${currentFilter}]setpts=PTS-STARTPTS[v]`);
 
     return filters.join(';');
   }
 
   /**
+   * Get slide entrance filter for entrance animations
+   * Uses fade effect for reliability as slide animations can be complex with ffmpeg
+   */
+  private getSlideEntranceFilter(
+    animation: string,
+    transitionFrames: number,
+  ): string | null {
+    // For slide animations, we use fade-in for reliability
+    // Complex slide transitions can cause rendering issues
+    const fadeInDuration = transitionFrames / this.VIDEO_FPS;
+
+    switch (animation) {
+      case 'slide-left':
+      case 'slide-right':
+      case 'slide-up':
+      case 'slide-down':
+        // Use fade-in for reliable entrance
+        return `fade=t=in:st=0:d=${fadeInDuration}`;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Get slide exit filter
+   * Note: Slide exit animations are complex with ffmpeg and may cause rendering issues.
+   * For reliability, we use fade transitions for exit animations.
+   */
+  private getSlideExitFilter(
+    _animation: string,
+    totalFrames: number,
+    transitionFrames: number,
+  ): string | null {
+    // For all exit animations, we use fade for reliability
+    // Full slide exits are complex and may not work smoothly with all content
+    return `fade=t=out:st=${(totalFrames - transitionFrames) / this.VIDEO_FPS}:d=${transitionFrames / this.VIDEO_FPS}`;
+  }
+
+  /**
    * Get Ken Burns effect filter
+   * Supports: pan-left, pan-right, pan-up, pan-down, zoom-slow, zoom-in, zoom-out, static
+   * Also supports slide transitions: slide-left, slide-right, slide-up, slide-down
    */
   private getKenBurnsFilter(
     animation: string,
@@ -182,36 +287,36 @@ export class FfmpegService {
 
     switch (animation) {
       case 'pan-left':
-        // Pan from right to left
-        return `zoompan=z='1.0':x='iw/zoom/2-(iw/zoom/2-iw/2)*on/${frames}':y='ih/zoom/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Pan from right to left - start at right edge, end at left edge
+        return `zoompan=z='1.2':x='iw-(iw/zoom-iw)*on/${frames}':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-right':
-        // Pan from left to right
-        return `zoompan=z='1.0':x='iw/zoom/2+(iw/zoom/2-iw/2)*on/${frames}':y='ih/zoom/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Pan from left to right - start at left edge, end at right edge
+        return `zoompan=z='1.2':x='(iw/zoom-iw)*on/${frames}':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-up':
         // Pan from bottom to top
-        return `zoompan=z='1.0':x='iw/zoom/2':y='ih/zoom/2-(ih/zoom/2-ih/2)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
+        return `zoompan=z='1.2':x='(iw-iw/zoom)/2':y='ih-(ih/zoom-ih)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'pan-down':
         // Pan from top to bottom
-        return `zoompan=z='1.0':x='iw/zoom/2':y='ih/zoom/2+(ih/zoom/2-ih/2)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
+        return `zoompan=z='1.2':x='(iw-iw/zoom)/2':y='(ih/zoom-ih)*on/${frames}':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-slow':
-        // Slow zoom in
-        return `zoompan=z='1.0+0.2*on/${frames}':x='iw/zoom/2':y='ih/zoom/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Slow zoom in (1.0 -> 1.15)
+        return `zoompan=z='min(1.0+0.15*on/${frames},1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-in':
-        // Zoom in effect
-        return `zoompan=z='1.0+0.5*on/${frames}':x='iw/zoom/2':y='ih/zoom/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Faster zoom in (1.0 -> 1.3)
+        return `zoompan=z='min(1.0+0.3*on/${frames},1.3)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'zoom-out':
-        // Zoom out effect
-        return `zoompan=z='1.5-0.5*on/${frames}':x='iw/zoom/2':y='ih/zoom/2':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Zoom out (1.3 -> 1.0)
+        return `zoompan=z='max(1.3-0.3*on/${frames},1.0)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=${frames}:s=1080x1920:fps=${fps}`;
 
       case 'static':
       default:
-        // No movement
+        // No movement - just display image at center
         return null;
     }
   }

@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EdgeTTS, listVoices } from 'edge-tts-universal';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export interface WordTimestamp {
   word: string;
@@ -15,6 +19,16 @@ export interface Voice {
   gender: string;
   locale: string;
   displayName?: string;
+}
+
+/**
+ * Prosody segment for expressive speech
+ */
+export interface ProsodySegment {
+  text: string;
+  rate: string; // e.g., '-10%', '+20%', '+0%'
+  volume: string; // e.g., '+10%', '-5%', '+0%'
+  pitch: string; // e.g., '+10Hz', '-5Hz', '+0Hz'
 }
 
 @Injectable()
@@ -80,6 +94,140 @@ export class TtsService {
     } catch (error) {
       this.logger.error(`Speech synthesis failed: ${error.message}`);
       throw new Error(`Speech synthesis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate speech with prosody segments for expressive speech
+   * Generates audio for each segment with different prosody settings and concatenates them
+   */
+  async generateSpeechWithProsody(
+    segments: ProsodySegment[],
+    speaker: string,
+    outputPath: string,
+  ): Promise<{
+    audioPath: string;
+    durationMs: number;
+    timestamps: WordTimestamp[];
+  }> {
+    try {
+      // Ensure output directory exists
+      const outputDir = path.dirname(outputPath);
+      await fs.mkdir(outputDir, { recursive: true });
+
+      // Parse voice name (remove gender suffix if present)
+      const voiceName = this.parseVoiceName(speaker);
+
+      // Generate audio for each segment
+      const segmentPaths: string[] = [];
+      const tempDir = path.join(outputDir, 'temp_segments');
+      await fs.mkdir(tempDir, { recursive: true });
+
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const segmentPath = path.join(tempDir, `segment_${i}.mp3`);
+
+        // Create TTS with prosody settings
+        const tts = new EdgeTTS(segment.text, voiceName, {
+          rate: segment.rate,
+          pitch: segment.pitch,
+          volume: segment.volume,
+        });
+
+        const result = await tts.synthesize();
+        const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
+        await fs.writeFile(segmentPath, audioBuffer);
+        segmentPaths.push(segmentPath);
+
+        this.logger.log(
+          `Generated segment ${i + 1}/${segments.length}: "${segment.text.substring(0, 30)}..." (rate: ${segment.rate}, volume: ${segment.volume}, pitch: ${segment.pitch})`,
+        );
+      }
+
+      // Concatenate all segments using ffmpeg
+      if (segmentPaths.length === 1) {
+        // Only one segment, just copy it
+        await fs.copyFile(segmentPaths[0], outputPath);
+      } else {
+        // Multiple segments, concatenate with ffmpeg
+        await this.concatenateAudio(segmentPaths, outputPath);
+      }
+
+      // Cleanup temp files
+      for (const segmentPath of segmentPaths) {
+        try {
+          await fs.unlink(segmentPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+      try {
+        await fs.rmdir(tempDir);
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      // Get final duration
+      const durationMs = await this.estimateAudioDuration(outputPath);
+
+      // Generate timestamps from all segment texts
+      const fullText = segments.map((s) => s.text).join(' ');
+      const timestamps = this.generateSimpleTimestamps(fullText, durationMs);
+
+      this.logger.log(
+        `Generated expressive speech with ${segments.length} segments: ${outputPath} (${durationMs}ms)`,
+      );
+
+      return {
+        audioPath: outputPath,
+        durationMs,
+        timestamps,
+      };
+    } catch (error) {
+      this.logger.error(`Prosody speech synthesis failed: ${error.message}`);
+      throw new Error(`Prosody speech synthesis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Concatenate multiple audio files using ffmpeg
+   */
+  /**
+   * Concatenate multiple audio files using ffmpeg
+   * Uses file list approach which is safer than direct path concatenation
+   */
+  private async concatenateAudio(
+    inputPaths: string[],
+    outputPath: string,
+  ): Promise<void> {
+    // Create a file list for ffmpeg concat
+    // Using absolute paths and escaping single quotes in file names
+    const listPath = outputPath + '.txt';
+    const listContent = inputPaths
+      .map((p) => {
+        const resolved = path.resolve(p);
+        // Escape single quotes in path for ffmpeg file list format
+        const escaped = resolved.replace(/'/g, "'\\''");
+        return `file '${escaped}'`;
+      })
+      .join('\n');
+    await fs.writeFile(listPath, listContent);
+
+    try {
+      // Use ffmpeg to concatenate
+      // Paths are already validated to be within our storage directories
+      const escapedListPath = listPath.replace(/'/g, "'\\''");
+      const escapedOutputPath = outputPath.replace(/'/g, "'\\''");
+      await execAsync(
+        `ffmpeg -f concat -safe 0 -i '${escapedListPath}' -c copy '${escapedOutputPath}' -y`,
+      );
+    } finally {
+      // Clean up list file
+      try {
+        await fs.unlink(listPath);
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   }
 
@@ -172,16 +320,34 @@ export class TtsService {
   }
 
   /**
-   * Estimate audio duration by reading the audio file
-   * This is a simple estimation - for production, consider using a library like ffprobe
+   * Get audio duration using ffprobe for accurate timing
+   * Falls back to file size estimation if ffprobe fails
    */
   private async estimateAudioDuration(audioPath: string): Promise<number> {
+    try {
+      // Try to use ffprobe for accurate duration
+      const escapedPath = audioPath.replace(/'/g, "'\\''");
+      const { stdout } = await execAsync(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '${escapedPath}'`,
+      );
+      const durationSeconds = parseFloat(stdout.trim());
+      if (!isNaN(durationSeconds)) {
+        return Math.round(durationSeconds * 1000);
+      }
+    } catch {
+      // ffprobe not available or failed, fall back to estimation
+      this.logger.warn(
+        'ffprobe failed, using file size estimation for duration',
+      );
+    }
+
+    // Fallback: estimate from file size
     try {
       const stats = await fs.stat(audioPath);
       // Rough estimation: MP3 bitrate ~128kbps
       // Duration (seconds) = (file size in bytes * 8) / (bitrate in kbps * 1000)
       const durationSeconds = (stats.size * 8) / (128 * 1000);
-      return Math.round(durationSeconds * 1000); // Convert to milliseconds
+      return Math.round(durationSeconds * 1000);
     } catch (error) {
       this.logger.warn(`Failed to estimate duration: ${error.message}`);
       return 0;

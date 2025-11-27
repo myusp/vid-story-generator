@@ -184,36 +184,46 @@ export class StoryService {
         }
       }
 
-      // Step 4: Generate SSML in batches and animations (skip if already generated)
+      // Step 4: Generate prosody segments and animations (skip if already generated)
       const scenesWithPrompts = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
 
-      const scenesWithoutSSML = scenesWithPrompts.filter((s) => !s.ssml);
-      if (scenesWithoutSSML.length > 0) {
+      const scenesWithoutProsody = scenesWithPrompts.filter(
+        (s) => !s.prosodyData,
+      );
+      if (scenesWithoutProsody.length > 0) {
         await this.logMessage(
           projectId,
           'INFO',
-          'GENERATING_SSML_ANIMATIONS',
-          `Generating SSML and animations (${scenesWithoutSSML.length} remaining)...`,
+          'GENERATING_PROSODY_ANIMATIONS',
+          `Generating prosody segments and animations (${scenesWithoutProsody.length} remaining)...`,
         );
 
-        // Use batch processing for SSML
-        const ssmlBatch = await this.aiService.generateSSMLBatch(
-          scenesWithoutSSML.map((s) => ({
+        // Use batch processing for prosody segments
+        const prosodyBatch = await this.aiService.generateProsodyBatch(
+          scenesWithoutProsody.map((s) => ({
             order: s.order,
             narration: s.narration,
           })),
-          project.speakerCode,
+          project.narrativeTone || '',
           provider,
         );
 
-        // Update scenes with SSML and generate animations
-        for (const scene of scenesWithoutSSML) {
-          const ssmlResult = ssmlBatch.find((s) => s.order === scene.order);
-          const ssml =
-            ssmlResult?.ssml || this.ttsService.convertToSsml(scene.narration);
+        // Update scenes with prosody data and generate animations
+        for (const scene of scenesWithoutProsody) {
+          const prosodyResult = prosodyBatch.find(
+            (s) => s.order === scene.order,
+          );
+          const prosodyData = prosodyResult?.segments || [
+            {
+              text: scene.narration,
+              rate: '+0%',
+              volume: '+0%',
+              pitch: '+0Hz',
+            },
+          ];
 
           // Generate animations
           const animations = await this.aiService.generateAnimations(
@@ -224,7 +234,7 @@ export class StoryService {
           await this.prisma.storyScene.update({
             where: { id: scene.id },
             data: {
-              ssml,
+              prosodyData: JSON.stringify(prosodyData),
               animationIn: animations.animationIn,
               animationShow: animations.animationShow,
               animationOut: animations.animationOut,
@@ -274,12 +284,12 @@ export class StoryService {
         });
       }
 
-      // Step 6: Generate TTS using SSML
+      // Step 6: Generate TTS using prosody segments for expressive speech
       await this.logMessage(
         projectId,
         'INFO',
         'GENERATING_TTS',
-        'Generating audio with SSML...',
+        'Generating expressive audio with prosody segments...',
       );
       await this.prisma.storyProject.update({
         where: { id: projectId },
@@ -300,16 +310,39 @@ export class StoryService {
       for (const scene of scenesWithImages) {
         const audioPath = path.join(
           audioDir,
-          `${projectId}_scene_${scene.order}.wav`,
+          `${projectId}_scene_${scene.order}.mp3`,
         );
 
-        // Use SSML for speech generation
-        const result = await this.ttsService.generateSpeech(
-          scene.ssml || scene.narration,
-          project.speakerCode,
-          audioPath,
-          !!scene.ssml, // useSsml = true if ssml exists
-        );
+        let result;
+
+        // Check if prosody data exists
+        if (scene.prosodyData) {
+          try {
+            const prosodySegments = JSON.parse(scene.prosodyData as string);
+            // Use prosody-based speech generation
+            result = await this.ttsService.generateSpeechWithProsody(
+              prosodySegments,
+              project.speakerCode,
+              audioPath,
+            );
+          } catch (parseError) {
+            // Fallback to regular speech if prosody parsing fails
+            result = await this.ttsService.generateSpeech(
+              scene.narration,
+              project.speakerCode,
+              audioPath,
+              false,
+            );
+          }
+        } else {
+          // Fallback to regular speech generation
+          result = await this.ttsService.generateSpeech(
+            scene.narration,
+            project.speakerCode,
+            audioPath,
+            false,
+          );
+        }
 
         await this.prisma.storyScene.update({
           where: { id: scene.id },

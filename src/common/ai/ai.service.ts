@@ -46,6 +46,23 @@ export interface BatchSSMLResult {
   }>;
 }
 
+/**
+ * Prosody segment for expressive speech
+ * Since edge-tts-universal doesn't support SSML, we split narration into parts
+ * with different prosody settings (rate, volume, pitch)
+ */
+export interface ProsodySegment {
+  text: string;
+  rate: string; // e.g., '-10%', '+20%', '+0%'
+  volume: string; // e.g., '+10%', '-5%', '+0%'
+  pitch: string; // e.g., '+10Hz', '-5Hz', '+0Hz'
+}
+
+export interface ProsodyData {
+  order: number;
+  segments: ProsodySegment[];
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -210,6 +227,93 @@ Return ONLY the image prompt as plain text, no JSON.`;
   }
 
   /**
+   * Step 3: Generate prosody segments in batches for expressive speech
+   * Edge-tts-universal supports prosody options (rate, volume, pitch) per synthesis call.
+   * We split narration into segments with different prosody settings for expressive delivery.
+   */
+  async generateProsodyBatch(
+    narrations: Array<{ order: number; narration: string }>,
+    narrativeTone: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<ProsodyData[]> {
+    const results: ProsodyData[] = [];
+
+    // Process in batches
+    for (let i = 0; i < narrations.length; i += this.batchSize) {
+      const batch = narrations.slice(i, i + this.batchSize);
+      const batchResults = await this.generateProsodyBatchInternal(
+        batch,
+        narrativeTone,
+        provider,
+      );
+      results.push(...batchResults);
+    }
+
+    return results.sort((a, b) => a.order - b.order);
+  }
+
+  private async generateProsodyBatchInternal(
+    narrations: Array<{ order: number; narration: string }>,
+    narrativeTone: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<ProsodyData[]> {
+    const toneDescription = narrativeTone
+      ? ` with a ${narrativeTone} delivery style`
+      : '';
+    const narrationsText = narrations
+      .map((n) => `Scene ${n.order}: "${n.narration}"`)
+      .join('\n');
+
+    const prompt = `Split these narrations into expressive speech segments${toneDescription}.
+
+For each narration, analyze the emotional content and split it into parts with appropriate prosody (rate, volume, pitch).
+
+Examples:
+- Normal text: rate="+0%", volume="+0%", pitch="+0Hz"
+- Excited/surprise (like "Duar!!!"): rate="+10%", volume="+50%", pitch="+10Hz"
+- Slow/suspenseful: rate="-20%", volume="-10%", pitch="-5Hz"
+- Sad/soft: rate="-10%", volume="-20%", pitch="-10Hz"
+- Fast action: rate="+15%", volume="+10%", pitch="+0Hz"
+- Whisper/mystery: rate="-15%", volume="-30%", pitch="-5Hz"
+- Dramatic pause before: rate="-25%", volume="+0%", pitch="+0Hz"
+
+Narrations:
+${narrationsText}
+
+Return ONLY a JSON array with prosody segments for each scene:
+[
+  {
+    "order": 1,
+    "segments": [
+      {"text": "first part of narration", "rate": "+0%", "volume": "+0%", "pitch": "+0Hz"},
+      {"text": "exciting part!", "rate": "+10%", "volume": "+30%", "pitch": "+5Hz"},
+      {"text": "calm ending.", "rate": "-5%", "volume": "+0%", "pitch": "+0Hz"}
+    ]
+  }
+]
+
+Rules:
+1. Split based on emotional changes, punctuation, and meaning
+2. Each segment should be a complete phrase (don't split mid-word)
+3. The combined segments should equal the full narration text
+4. Use realistic prosody values (rate: -30% to +30%, volume: -50% to +50%, pitch: -20Hz to +20Hz)`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const results = JSON.parse(this.extractJSON(response));
+
+    return results.map((item: any) => ({
+      order: item.order,
+      segments: item.segments.map((s: any) => ({
+        text: s.text,
+        rate: s.rate || '+0%',
+        volume: s.volume || '+0%',
+        pitch: s.pitch || '+0Hz',
+      })),
+    }));
+  }
+
+  /**
+   * Legacy SSML generation - kept for backwards compatibility
    * Step 3: Generate SSML in batches
    */
   async generateSSMLBatch(

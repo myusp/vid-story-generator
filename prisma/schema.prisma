@@ -45,6 +45,7 @@ model StoryScene {
   imagePrompt   String?
   narration     String?
   ssml          String?
+  prosodyData   String?      // JSON string containing prosody segments
   imagePath     String?
   audioPath     String?
   startTimeMs   Int?
