@@ -1,20 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createSRT } from 'edge-tts-universal';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiService } from '../../common/ai/ai.service';
-import { TtsService } from '../../common/tts/tts.service';
-import { ImageService } from '../../common/image/image.service';
 import { FfmpegService } from '../../common/ffmpeg/ffmpeg.service';
-import { SrtGenerator } from '../../common/utils/srt-generator';
+import { ImageService } from '../../common/image/image.service';
 import { generateSafeSlug } from '../../common/utils/file-naming';
 import { StartStoryDto } from '../../common/dto/start-story.dto';
 import { StoryStatus } from '../../common/enums/story-status.enum';
 import { LogsService } from '../logs/logs.service';
 import * as path from 'path';
 import * as fs from 'fs';
+import { SrtGenerator } from '../../common/utils/srt-generator';
+import { TtsService } from '../../common/tts/tts.service';
+import type { SubtitleWordBoundary } from '../../common/tts/tts.service';
 
 @Injectable()
 export class StoryService {
+  private readonly logger = new Logger(StoryService.name);
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -444,16 +448,35 @@ export class StoryService {
         './storage/audio',
       );
       let currentTime = 0;
+      let hasCompleteWordBoundaries = true;
+      const globalWordBoundaries: SubtitleWordBoundary[] = [];
+      const HNS_PER_MS = 10000;
 
       const scenesWithImages = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
 
+      this.logger.log(
+        `Starting TTS generation for ${scenesWithImages.length} scenes`,
+      );
+      await this.logMessage(
+        projectId,
+        'INFO',
+        'GENERATING_TTS',
+        `Starting TTS generation for ${scenesWithImages.length} scenes...`,
+      );
+
       for (const scene of scenesWithImages) {
+        this.logger.log(
+          `Processing scene ${scene.order}/${scenesWithImages.length}`,
+        );
+
         // Skip if audio already generated
         if (scene.audioPath && fs.existsSync(scene.audioPath)) {
+          this.logger.log(`Scene ${scene.order} already has audio, skipping`);
           currentTime = scene.endTimeMs || currentTime;
+          hasCompleteWordBoundaries = false;
           continue;
         }
         const audioPath = path.join(
@@ -462,46 +485,112 @@ export class StoryService {
         );
 
         let result;
+        let lastError;
+        const maxRetries = 3;
 
-        // Check if prosody data exists
-        if (scene.prosodyData) {
+        // Retry mechanism for TTS generation
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
-            const prosodySegments = JSON.parse(scene.prosodyData as string);
-            // Use prosody-based speech generation
-            result = await this.ttsService.generateSpeechWithProsody(
-              prosodySegments,
-              project.speakerCode,
-              audioPath,
+            await this.logMessage(
+              projectId,
+              'INFO',
+              'GENERATING_TTS',
+              `Generating audio for scene ${scene.order}/${scenesWithImages.length} (attempt ${attempt}/${maxRetries})...`,
             );
-          } catch (parseError) {
-            // Fallback to regular speech if prosody parsing fails
-            result = await this.ttsService.generateSpeech(
-              scene.narration,
-              project.speakerCode,
-              audioPath,
-              false,
+
+            // Check if prosody data exists
+            if (scene.prosodyData) {
+              try {
+                const prosodySegments = JSON.parse(scene.prosodyData as string);
+                // Use prosody-based speech generation
+                result = await this.ttsService.generateSpeechWithProsody(
+                  prosodySegments,
+                  project.speakerCode,
+                  audioPath,
+                );
+              } catch (parseError) {
+                this.logger.warn(
+                  `Prosody parsing failed for scene ${scene.order}: ${parseError.message}`,
+                );
+                // Fallback to regular speech if prosody parsing fails
+                result = await this.ttsService.generateSpeech(
+                  scene.narration,
+                  project.speakerCode,
+                  audioPath,
+                  false,
+                );
+              }
+            } else {
+              // Fallback to regular speech generation
+              result = await this.ttsService.generateSpeech(
+                scene.narration,
+                project.speakerCode,
+                audioPath,
+                false,
+              );
+            }
+
+            // Success - break retry loop
+            break;
+          } catch (error) {
+            lastError = error;
+            this.logger.error(
+              `TTS generation failed for scene ${scene.order} (attempt ${attempt}/${maxRetries}): ${error.message}`,
             );
+
+            if (attempt < maxRetries) {
+              await this.logMessage(
+                projectId,
+                'WARN',
+                'GENERATING_TTS',
+                `TTS failed for scene ${scene.order}, retrying (${attempt}/${maxRetries})...`,
+              );
+              // Wait before retry (exponential backoff)
+              await new Promise((resolve) =>
+                setTimeout(resolve, 2000 * attempt),
+              );
+            }
           }
-        } else {
-          // Fallback to regular speech generation
-          result = await this.ttsService.generateSpeech(
-            scene.narration,
-            project.speakerCode,
-            audioPath,
-            false,
+        }
+
+        // If all retries failed, throw error
+        if (!result) {
+          await this.logMessage(
+            projectId,
+            'ERROR',
+            'GENERATING_TTS',
+            `Failed to generate TTS for scene ${scene.order} after ${maxRetries} attempts: ${lastError?.message}`,
+          );
+          throw new Error(
+            `TTS generation failed for scene ${scene.order}: ${lastError?.message}`,
           );
         }
+
+        const sceneStartMs = currentTime;
 
         await this.prisma.storyScene.update({
           where: { id: scene.id },
           data: {
             audioPath,
-            startTimeMs: currentTime,
-            endTimeMs: currentTime + result.durationMs,
+            startTimeMs: sceneStartMs,
+            endTimeMs: sceneStartMs + result.durationMs,
           },
         });
 
         currentTime += result.durationMs;
+
+        if (result.wordBoundaries?.length) {
+          const sceneStartHns = Math.round(sceneStartMs * HNS_PER_MS);
+          result.wordBoundaries.forEach((boundary) => {
+            globalWordBoundaries.push({
+              text: boundary.text,
+              offset: boundary.offset + sceneStartHns,
+              duration: boundary.duration,
+            });
+          });
+        } else {
+          hasCompleteWordBoundaries = false;
+        }
       }
 
       // Step 7: Render video with animations
@@ -568,14 +657,20 @@ export class StoryService {
       );
       const srtPath = path.join(srtOutputDir, `${filePrefix}.srt`);
 
-      const subtitles = updatedScenes.map((scene, index) => ({
-        index: index + 1,
-        startTime: SrtGenerator.msToSrtTime(scene.startTimeMs),
-        endTime: SrtGenerator.msToSrtTime(scene.endTimeMs),
-        text: scene.narration,
-      }));
+      let srtContent: string;
+      if (hasCompleteWordBoundaries && globalWordBoundaries.length > 0) {
+        globalWordBoundaries.sort((a, b) => a.offset - b.offset);
+        srtContent = createSRT(globalWordBoundaries);
+      } else {
+        const subtitles = updatedScenes.map((scene, index) => ({
+          index: index + 1,
+          startTime: SrtGenerator.msToSrtTime(scene.startTimeMs),
+          endTime: SrtGenerator.msToSrtTime(scene.endTimeMs),
+          text: scene.narration,
+        }));
+        srtContent = SrtGenerator.generateSrt(subtitles);
+      }
 
-      const srtContent = SrtGenerator.generateSrt(subtitles);
       fs.writeFileSync(srtPath, srtContent);
 
       // Update project

@@ -6,13 +6,14 @@ Backend API for generating AI-powered short video stories with Azure TTS and Pol
 
 - 🤖 AI-powered story generation (Gemini/OpenAI with round-robin API key rotation)
 - 🎙️ Azure TTS voice-over with word-level timestamps
-- 🖼️ Polinations AI image generation
+- 🖼️ Polinations AI image generation with automatic retry
 - 🎬 FFmpeg video rendering pipeline
 - 📝 SRT subtitle generation
 - 📊 Real-time progress monitoring with SSE
 - 📚 Swagger API documentation
 - 🔒 API key authentication
 - 💾 SQLite database with Prisma ORM
+- 🔄 Automatic retry with exponential backoff for network errors
 
 ## Tech Stack
 
@@ -24,6 +25,7 @@ Backend API for generating AI-powered short video stories with Azure TTS and Pol
 - **Polinations AI** - Image generation
 - **FFmpeg** - Video rendering
 - **Google Gemini / OpenAI** - Story generation
+- **axios-retry** - Automatic retry with exponential backoff
 
 ## Prerequisites
 
@@ -134,6 +136,29 @@ storage/
 ## API Key Rolling
 
 The system supports round-robin API key rotation for both Gemini and OpenAI to handle rate limits effectively. Configure multiple keys separated by commas in the environment variables.
+
+## Error Handling & Retry Mechanism
+
+### Image Generation Retry
+The image service automatically retries failed requests using `axios-retry` with the following configuration:
+
+- **Retries**: Up to 5 attempts
+- **Retry Delay**: Exponential backoff (1s, 2s, 4s, 8s, 16s)
+- **Retry Conditions**: 
+  - Network errors (ECONNRESET, ETIMEDOUT, etc.)
+  - HTTP 5xx status codes (500, 502, 503, 504, etc.)
+- **Logging**: Each retry attempt is logged with the error message
+
+This helps handle temporary issues with the Polinations AI service, such as:
+- 502 Bad Gateway errors
+- Network timeouts
+- Service temporary unavailability
+
+### AI Service Retry
+The AI service implements intelligent retry logic with model fallback:
+- Primary model fails → fallback to secondary model
+- Automatic retry with configurable delays
+- Batch processing for prosody data
 
 ## License
 

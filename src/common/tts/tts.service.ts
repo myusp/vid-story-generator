@@ -13,6 +13,12 @@ export interface WordTimestamp {
   endMs: number;
 }
 
+export interface SubtitleWordBoundary {
+  text: string;
+  offset: number; // 100-nanosecond units as required by edge-tts-universal
+  duration: number; // 100-nanosecond units
+}
+
 export interface Voice {
   name: string;
   shortName: string;
@@ -50,7 +56,9 @@ export class TtsService {
     audioPath: string;
     durationMs: number;
     timestamps: WordTimestamp[];
+    wordBoundaries: SubtitleWordBoundary[];
   }> {
+    this.logger.log(`Starting TTS generation for ${outputPath}`);
     try {
       // Ensure output directory exists
       const outputDir = path.dirname(outputPath);
@@ -58,19 +66,40 @@ export class TtsService {
 
       // Parse voice name (remove gender suffix if present)
       const voiceName = this.parseVoiceName(speaker);
+      this.logger.log(`Using voice: ${voiceName}`);
 
       // edge-tts-universal supports SSML directly in the text parameter
       // If text contains SSML tags, it will be processed automatically
       // No need for special handling - just pass the text as-is
+      this.logger.log(`Creating EdgeTTS instance...`);
       const tts = new EdgeTTS(text, voiceName, {
         rate: '+0%',
         pitch: '+0Hz',
       });
 
-      // Synthesize speech
-      const result = await tts.synthesize();
+      // Synthesize speech with timeout
+      this.logger.log(`Starting synthesis...`);
+      const result = (await Promise.race([
+        tts.synthesize(),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('TTS synthesis timeout after 60s')),
+            60000,
+          ),
+        ),
+      ])) as Awaited<ReturnType<typeof tts.synthesize>>;
+
+      const subtitleEntries = result.subtitle || [];
+      const wordBoundaries: SubtitleWordBoundary[] = subtitleEntries.map(
+        (entry) => ({
+          text: entry.text || '',
+          offset: entry.offset || 0,
+          duration: entry.duration || 0,
+        }),
+      );
 
       // Save audio file
+      this.logger.log(`Saving audio file...`);
       const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
       await fs.writeFile(outputPath, audioBuffer);
 
@@ -90,9 +119,11 @@ export class TtsService {
         audioPath: outputPath,
         durationMs,
         timestamps,
+        wordBoundaries,
       };
     } catch (error) {
       this.logger.error(`Speech synthesis failed: ${error.message}`);
+      this.logger.error(error.stack);
       throw new Error(`Speech synthesis failed: ${error.message}`);
     }
   }
@@ -109,6 +140,7 @@ export class TtsService {
     audioPath: string;
     durationMs: number;
     timestamps: WordTimestamp[];
+    wordBoundaries: SubtitleWordBoundary[];
   }> {
     try {
       // Ensure output directory exists
@@ -122,6 +154,9 @@ export class TtsService {
       const segmentPaths: string[] = [];
       const tempDir = path.join(outputDir, 'temp_segments');
       await fs.mkdir(tempDir, { recursive: true });
+
+      let segmentOffsetNs = 0;
+      const wordBoundaries: SubtitleWordBoundary[] = [];
 
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i];
@@ -138,6 +173,19 @@ export class TtsService {
         const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
         await fs.writeFile(segmentPath, audioBuffer);
         segmentPaths.push(segmentPath);
+
+        const segmentEntries = result.subtitle || [];
+        const segmentBoundaries = segmentEntries.map((entry) => ({
+          text: entry.text || '',
+          offset: (entry.offset || 0) + segmentOffsetNs,
+          duration: entry.duration || 0,
+        }));
+        wordBoundaries.push(...segmentBoundaries);
+
+        const lastBoundary = segmentBoundaries[segmentBoundaries.length - 1];
+        if (lastBoundary) {
+          segmentOffsetNs = lastBoundary.offset + lastBoundary.duration;
+        }
 
         this.logger.log(
           `Generated segment ${i + 1}/${segments.length}: "${segment.text.substring(0, 30)}..." (rate: ${segment.rate}, volume: ${segment.volume}, pitch: ${segment.pitch})`,
@@ -182,6 +230,7 @@ export class TtsService {
         audioPath: outputPath,
         durationMs,
         timestamps,
+        wordBoundaries,
       };
     } catch (error) {
       this.logger.error(`Prosody speech synthesis failed: ${error.message}`);

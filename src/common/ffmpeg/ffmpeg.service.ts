@@ -20,7 +20,16 @@ export class FfmpegService {
   // Lower fps = smoother zoompan calculations, zero micro-stuttering
   private readonly VIDEO_FPS = 24;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) {
+    // Set FFmpeg and FFprobe paths for Docker environment
+    // In Debian-based image, binaries are in /usr/bin
+    // const ffmpegPath = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
+    // const ffprobePath = process.env.FFPROBE_PATH || '/usr/bin/ffprobe';
+    // ffmpeg.setFfmpegPath(ffmpegPath);
+    // ffmpeg.setFfprobePath(ffprobePath);
+    // this.logger.log(`FFmpeg path set to: ${ffmpegPath}`);
+    // this.logger.log(`FFprobe path set to: ${ffprobePath}`);
+  }
 
   /**
    * Create scene video with Ken Burns effects and transitions

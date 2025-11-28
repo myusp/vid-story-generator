@@ -33,6 +33,11 @@ export class CleanupService implements OnModuleInit {
     } else {
       this.logger.log('Asset cleanup disabled (ASSET_TTL_HOURS=0)');
     }
+
+    // Always run stuck process recovery every 5 minutes
+    setInterval(() => this.recoverStuckProcesses(), 5 * 60 * 1000);
+    // Run once on startup after 30 seconds
+    setTimeout(() => this.recoverStuckProcesses(), 30000);
   }
 
   /**
@@ -186,6 +191,68 @@ export class CleanupService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.warn('Failed to cleanup tmp files:', error);
+    }
+  }
+
+  /**
+   * Recover stuck processes that have been in progress for too long
+   * A process is considered stuck if it's been in a non-terminal status for more than 30 minutes
+   */
+  async recoverStuckProcesses() {
+    try {
+      const stuckTimeoutMinutes = 30;
+      const cutoffDate = new Date(Date.now() - stuckTimeoutMinutes * 60 * 1000);
+
+      const stuckProjects = await this.prisma.storyProject.findMany({
+        where: {
+          status: {
+            in: [
+              'GENERATING_SCENES',
+              'GENERATING_IMAGES',
+              'GENERATING_TTS',
+              'RENDERING_VIDEO',
+            ],
+          },
+          updatedAt: {
+            lt: cutoffDate,
+          },
+        },
+      });
+
+      if (stuckProjects.length === 0) {
+        return;
+      }
+
+      this.logger.warn(
+        `Found ${stuckProjects.length} stuck projects, marking as FAILED`,
+      );
+
+      for (const project of stuckProjects) {
+        this.logger.warn(
+          `Recovering stuck project ${project.id} (${project.projectSlug}) - stuck in ${project.status} for ${Math.round((Date.now() - project.updatedAt.getTime()) / 60000)} minutes`,
+        );
+
+        await this.prisma.storyProject.update({
+          where: { id: project.id },
+          data: { status: 'FAILED' },
+        });
+
+        // Log the recovery
+        await this.prisma.storyLog.create({
+          data: {
+            projectId: project.id,
+            level: 'ERROR',
+            code: 'PROCESS_TIMEOUT',
+            message: `Process stuck in ${project.status} for more than ${stuckTimeoutMinutes} minutes. Marked as FAILED. You can retry the generation.`,
+          },
+        });
+      }
+
+      this.logger.log(
+        `Successfully recovered ${stuckProjects.length} stuck projects`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to recover stuck processes:', error);
     }
   }
 }

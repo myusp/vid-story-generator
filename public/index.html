@@ -1218,7 +1218,14 @@ Scene 3: Third narration here..."></textarea>
         function subscribeToProjectLogs(projectId) {
             if (sseConnections.has(projectId)) return;
             
-            const eventSource = new EventSource(`${API_URL}/stories/${projectId}/logs/stream`);
+            // Get API key from localStorage and add to URL as query parameter
+            // EventSource doesn't support custom headers, so we use query param
+            const apiKey = localStorage.getItem('apiKey');
+            const sseUrl = apiKey 
+                ? `${API_URL}/stories/${projectId}/logs/stream?api-key=${encodeURIComponent(apiKey)}`
+                : `${API_URL}/stories/${projectId}/logs/stream`;
+            
+            const eventSource = new EventSource(sseUrl);
             
             eventSource.onopen = () => {
                 document.getElementById('sseStatus').className = 'sse-status connected';

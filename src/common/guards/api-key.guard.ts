@@ -21,7 +21,8 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const apiKey = request.headers['x-api-key'];
+    // Support API key in header (preferred) or query parameter (for SSE)
+    const apiKey = request.headers['x-api-key'] || request.query['api-key'];
 
     const validKeys = this.configService
       .get<string>('API_KEYS', '')
