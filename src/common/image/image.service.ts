@@ -25,7 +25,7 @@ export class ImageService {
     // Configure axios-retry with exponential backoff
     axiosRetry(this.axiosInstance, {
       retries: 5, // Retry up to 5 times
-      retryDelay: axiosRetry.exponentialDelay, // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+      retryDelay: (r, e) => axiosRetry.exponentialDelay(r, e, 3),
       retryCondition: (error) => {
         // Retry on network errors or 5xx status codes (including 502)
         return (
