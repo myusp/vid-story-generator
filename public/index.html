@@ -1000,11 +1000,12 @@ Scene 3: Third narration here..."></textarea>
             localStorage.setItem('speakerFavorites', JSON.stringify(favorites));
         }
 
-        // Play voice preview (uses browser's speech synthesis as fallback)
+        // Play voice preview using streaming TTS API
         async function playVoice(shortName, btn) {
             // Stop any currently playing audio
             if (currentAudio) {
                 currentAudio.pause();
+                currentAudio.currentTime = 0;
                 currentAudio = null;
                 if (currentPlayingBtn) {
                     currentPlayingBtn.textContent = '▶';
@@ -1017,14 +1018,60 @@ Scene 3: Third narration here..."></textarea>
                 return;
             }
 
-            btn.textContent = '⏹';
+            btn.textContent = '⏳';
             btn.classList.add('playing');
             currentPlayingBtn = btn;
 
             try {
-                // For now, use browser's speech synthesis as a preview
-                // In production, you could call an API endpoint to generate a sample
-                const utterance = new SpeechSynthesisUtterance('Hello! This is a voice preview for short story generation.');
+                // Use the streaming TTS preview API endpoint
+                const previewUrl = `${API_URL}/speakers/preview?speaker=${encodeURIComponent(shortName)}`;
+                
+                // Create audio element and stream the preview
+                const audio = new Audio(previewUrl);
+                currentAudio = audio;
+                
+                audio.oncanplaythrough = () => {
+                    btn.textContent = '⏹';
+                    audio.play();
+                };
+                
+                audio.onended = () => {
+                    btn.textContent = '▶';
+                    btn.classList.remove('playing');
+                    currentPlayingBtn = null;
+                    currentAudio = null;
+                };
+                
+                audio.onerror = (e) => {
+                    console.error('Audio streaming error:', e);
+                    btn.textContent = '▶';
+                    btn.classList.remove('playing');
+                    currentPlayingBtn = null;
+                    currentAudio = null;
+                    // Fallback to browser speech synthesis
+                    fallbackToSpeechSynthesis(shortName, btn);
+                };
+                
+                // Start loading the audio
+                audio.load();
+            } catch (error) {
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+                console.error('Voice preview failed:', error);
+                // Fallback to browser speech synthesis
+                fallbackToSpeechSynthesis(shortName, btn);
+            }
+        }
+
+        // Fallback to browser's speech synthesis if TTS API fails
+        function fallbackToSpeechSynthesis(shortName, btn) {
+            try {
+                btn.textContent = '⏹';
+                btn.classList.add('playing');
+                currentPlayingBtn = btn;
+                
+                const utterance = new SpeechSynthesisUtterance('Hello! This is a voice preview.');
                 utterance.lang = shortName.split('-').slice(0, 2).join('-');
                 utterance.onend = () => {
                     btn.textContent = '▶';
@@ -1036,7 +1083,7 @@ Scene 3: Third narration here..."></textarea>
                 btn.textContent = '▶';
                 btn.classList.remove('playing');
                 currentPlayingBtn = null;
-                console.error('Voice preview failed:', error);
+                console.error('Fallback speech synthesis failed:', error);
             }
         }
 

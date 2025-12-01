@@ -137,7 +137,7 @@ export class FfmpegService {
     duration: number,
   ): string {
     const fps = this.VIDEO_FPS;
-    const transitionDuration = 0.5; // 0.5 seconds for transitions
+    const transitionDuration = 0.4; // Reduced from 0.5 to 0.4 for snappier transitions
 
     // Calculate actual animation duration (subtract transition times)
     const hasIn = animations?.animationIn && animations.animationIn !== 'none';
@@ -150,11 +150,12 @@ export class FfmpegService {
 
     // Start with scaling and padding
     // CRITICAL FIX for 4K→FHD shaking:
-    // 1. Scale to EXACT 1080x1920 first (no decrease/padding yet) using best quality algo
+    // 1. Scale to EXACT 1080x1920 first using high-quality lanczos algorithm
     // 2. Apply format=yuv420p for consistent subsampling
-    // 3. Then apply zoompan on already-downscaled image to prevent pixel rounding jitter
-    // Using bicubic instead of lanczos - faster and actually smoother for video
-    let filterChain = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,crop=1080:1920,setsar=1,format=yuv420p,fps=${fps}`;
+    // 3. Use exact fps to prevent frame timing issues
+    // 4. Apply zoompan on already-downscaled image to prevent pixel rounding jitter
+    // Using lanczos for best quality and smoothest scaling
+    let filterChain = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1,format=yuv420p,fps=fps=${fps}`;
 
     // If no animations, keep it simple - NO minterpolate to avoid shaking
     if (
@@ -183,35 +184,35 @@ export class FfmpegService {
       }
     }
 
-    // Apply entrance animation (fade in)
+    // Apply entrance animation (fade in) with smoother curve
     if (animations.animationIn && animations.animationIn !== 'none') {
       if (
         animations.animationIn === 'fade' ||
         animations.animationIn.startsWith('slide-')
       ) {
-        filterChain += `,fade=t=in:st=0:d=${transitionDuration}`;
+        // Use easing curve for smoother fade: sine easing
+        filterChain += `,fade=t=in:st=0:d=${transitionDuration}:curve=qsin`;
       } else if (animations.animationIn === 'zoom-in') {
-        // For zoom-in entrance, we'll use scale with conditional
-        // This is simpler than complex zoompan
-        filterChain += `,fade=t=in:st=0:d=${transitionDuration}`;
+        filterChain += `,fade=t=in:st=0:d=${transitionDuration}:curve=qsin`;
       } else if (animations.animationIn === 'zoom-out') {
-        filterChain += `,fade=t=in:st=0:d=${transitionDuration}`;
+        filterChain += `,fade=t=in:st=0:d=${transitionDuration}:curve=qsin`;
       }
     }
 
-    // Apply exit animation (fade out)
+    // Apply exit animation (fade out) with smoother curve
     if (animations.animationOut && animations.animationOut !== 'none') {
       const exitStart = Math.max(0, duration - transitionDuration);
       if (
         animations.animationOut === 'fade' ||
         animations.animationOut.startsWith('slide-')
       ) {
-        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}`;
+        // Use easing curve for smoother fade: sine easing
+        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}:curve=qsin`;
       } else if (
         animations.animationOut === 'zoom-in' ||
         animations.animationOut === 'zoom-out'
       ) {
-        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}`;
+        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}:curve=qsin`;
       }
     }
 
@@ -227,6 +228,11 @@ export class FfmpegService {
    * Uses min(zoom+increment,max) for smooth frame-by-frame progression instead of time-based easing
    * Key: increment = (final_zoom - initial_zoom) / total_frames
    * This eliminates jitter/zigzag by using linear per-frame increments
+   *
+   * SMOOTH TRANSITION FIX:
+   * - Reduced zoom ranges to minimize shaking (smaller movements = smoother)
+   * - Using consistent pan increment calculations
+   * - Fixed zoom values to prevent floating-point precision issues
    */
   private getKenBurnsFilter(
     animation: string,
@@ -235,58 +241,58 @@ export class FfmpegService {
     const fps = this.VIDEO_FPS;
     const frames = Math.floor(duration * fps);
 
-    // Calculate zoom increments per frame for smooth progression
-    // Formula: (max_zoom - min_zoom) / frames
-    const zoomSlowIncrement = 0.04 / frames; // 1.0 → 1.04
-    const zoomInIncrement = 0.08 / frames; // 1.0 → 1.08
-    const zoomOutDecrement = 0.1 / frames; // 1.1 → 1.0
+    // Use smaller zoom ranges for smoother, less shaky animations
+    // Reduced from 0.04-0.1 to 0.02-0.05 for subtler, smoother movements
+    const zoomSlowIncrement = 0.02 / frames; // 1.0 → 1.02 (was 1.04)
+    const zoomInIncrement = 0.04 / frames; // 1.0 → 1.04 (was 1.08)
+    const zoomOutDecrement = 0.05 / frames; // 1.05 → 1.0 (was 1.1 → 1.0)
 
-    // Pan increment per frame (for 5% zoom overpan)
-    // x range: 0 to (iw-iw/1.05) = smooth left-to-right motion
+    // Pan increment per frame - use consistent small zoom for panning
+    // Smaller zoom (1.03) reduces shaking while still allowing pan movement
     const panIncrement = 1.0 / frames;
 
     switch (animation) {
       case 'pan-left': {
-        // Pan from right to left with constant 1.05x zoom
+        // Pan from right to left with constant 1.03x zoom (reduced from 1.05)
         // x starts at max (right), decrements to 0 (left)
-        return `zoompan=z=1.05:x='(iw-iw/zoom)*(1-${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920`;
+        return `zoompan=z=1.03:x='(iw-iw/zoom)*(1-${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'pan-right': {
         // Pan from left to right
         // x starts at 0 (left), increments to max (right)
-        return `zoompan=z=1.05:x='(iw-iw/zoom)*(${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920`;
+        return `zoompan=z=1.03:x='(iw-iw/zoom)*(${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'pan-up': {
         // Pan from bottom to top, centered horizontally
-        return `zoompan=z=1.05:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-${panIncrement}*on)':d=${frames}:s=1080x1920`;
+        return `zoompan=z=1.03:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-${panIncrement}*on)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'pan-down': {
         // Pan from top to bottom
-        return `zoompan=z=1.05:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(${panIncrement}*on)':d=${frames}:s=1080x1920`;
+        return `zoompan=z=1.03:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(${panIncrement}*on)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'zoom-slow': {
-        // Smooth zoom 1.0 → 1.04 using min() to clamp at final zoom
-        return `zoompan=z='min(zoom+${zoomSlowIncrement},1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920`;
+        // Smooth zoom 1.0 → 1.02 using min() to clamp at final zoom
+        return `zoompan=z='min(zoom+${zoomSlowIncrement},1.02)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'zoom-in': {
-        // Smooth zoom 1.0 → 1.08 using min() to clamp
-        return `zoompan=z='min(zoom+${zoomInIncrement},1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920`;
+        // Smooth zoom 1.0 → 1.04 using min() to clamp
+        return `zoompan=z='min(zoom+${zoomInIncrement},1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'zoom-out': {
-        // Smooth zoom out 1.1 → 1.0 using max() to clamp at 1.0
-        return `zoompan=z='max(zoom-${zoomOutDecrement},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920`;
+        // Smooth zoom out 1.05 → 1.0 using max() to clamp at 1.0
+        return `zoompan=z='max(1.05-${zoomOutDecrement}*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'static':
       default: {
         // Static frame, centered
-        return `zoompan=z=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920`;
+        return `zoompan=z=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
     }
   }

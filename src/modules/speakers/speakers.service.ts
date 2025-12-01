@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Response } from 'express';
+import { EdgeTTS } from 'edge-tts-universal';
 import { TtsService } from '../../common/tts/tts.service';
 
 @Injectable()
 export class SpeakersService {
+  private readonly logger = new Logger(SpeakersService.name);
+
   constructor(private ttsService: TtsService) {}
 
   async listAvailableSpeakers() {
@@ -56,5 +60,45 @@ export class SpeakersService {
     return allSpeakers.filter((speaker) =>
       popularVoiceNames.includes(speaker.shortName),
     );
+  }
+
+  /**
+   * Stream TTS audio preview directly to response
+   */
+  async streamPreview(
+    speaker: string,
+    text: string,
+    res: Response,
+  ): Promise<void> {
+    try {
+      // Parse voice name (remove gender suffix if present)
+      const voiceName = speaker
+        .replace(/-Female$/, '')
+        .replace(/-Male$/, '')
+        .trim();
+
+      this.logger.log(`Streaming TTS preview for voice: ${voiceName}`);
+
+      // Create TTS instance
+      const tts = new EdgeTTS(text, voiceName, {
+        rate: '+0%',
+        pitch: '+0Hz',
+      });
+
+      // Synthesize and stream
+      const result = await tts.synthesize();
+      const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
+
+      // Set response headers for audio streaming
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', audioBuffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+
+      // Send audio data
+      res.end(audioBuffer);
+    } catch (error) {
+      this.logger.error(`TTS preview failed: ${error.message}`);
+      res.status(500).json({ error: 'Failed to generate TTS preview' });
+    }
   }
 }

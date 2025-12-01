@@ -164,6 +164,9 @@ Rules:
 3. Maintain the original story's flow and meaning
 4. Each scene narration should be suitable for a single video scene (5-15 seconds when spoken)
 5. Keep the narrations in the same language as the original text (${language})
+6. Use simple, clear language that a 10-year-old can understand
+7. Avoid poetic, flowery, or hyperbolic expressions
+8. Use short, direct sentences with common words
 
 Return ONLY a JSON array in this exact format:
 [
@@ -246,6 +249,14 @@ Return ONLY a JSON object in this exact format:
 
 Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
 
+IMPORTANT LANGUAGE RULES:
+- Use simple, clear language that a 10-year-old can understand
+- Avoid poetic, flowery, or hyperbolic expressions
+- Use short, direct sentences
+- Choose common words over fancy or complex vocabulary
+- Be conversational and natural, not dramatic or exaggerated
+- Keep sentences concise and easy to follow
+
 Return ONLY a JSON array in this exact format:
 [
   {
@@ -289,6 +300,14 @@ Style: ${toneDescription}
 
 Generate ONLY the narration text for each scene. Each narration should be a single paragraph that flows naturally when spoken.
 Make it engaging and suitable for shorts format.
+
+IMPORTANT LANGUAGE RULES:
+- Use simple, clear language that a 10-year-old can understand
+- Avoid poetic, flowery, or hyperbolic expressions
+- Use short, direct sentences
+- Choose common words over fancy or complex vocabulary
+- Be conversational and natural, not dramatic or exaggerated
+- Keep sentences concise and easy to follow
 
 Return ONLY a JSON array in this exact format:
 [

@@ -15,6 +15,8 @@ import * as fs from 'fs';
 import { SrtGenerator } from '../../common/utils/srt-generator';
 import { TtsService } from '../../common/tts/tts.service';
 import type { SubtitleWordBoundary } from '../../common/tts/tts.service';
+import { textToProsodySegments } from '../../common/utils/punctuation-splitter';
+import pMap from 'p-map';
 
 @Injectable()
 export class StoryService {
@@ -419,29 +421,10 @@ export class StoryService {
           `Generating prosody segments and animations (${scenesWithoutProsody.length} remaining)...`,
         );
 
-        // Use batch processing for prosody segments
-        const prosodyBatch = await this.aiService.generateProsodyBatch(
-          scenesWithoutProsody.map((s) => ({
-            order: s.order,
-            narration: s.narration,
-          })),
-          project.narrativeTone || '',
-          provider,
-        );
-
-        // Update scenes with prosody data and generate animations
+        // Update scenes with prosody data (punctuation-based) and generate animations
         for (const scene of scenesWithoutProsody) {
-          const prosodyResult = prosodyBatch.find(
-            (s) => s.order === scene.order,
-          );
-          const prosodyData = prosodyResult?.segments || [
-            {
-              text: scene.narration,
-              rate: '+0%',
-              volume: '+0%',
-              pitch: '+0Hz',
-            },
-          ];
+          // Use punctuation-based splitting instead of AI for prosody segments
+          const prosodyData = textToProsodySegments(scene.narration);
 
           // Generate animations with allowed animations filter
           const animations = await this.aiService.generateAnimations(
@@ -486,26 +469,37 @@ export class StoryService {
       const width = project.orientation === 'PORTRAIT' ? 2160 : 3840;
       const height = project.orientation === 'PORTRAIT' ? 3840 : 2160;
 
-      for (const scene of scenesWithSsml) {
-        // Skip if image already generated
-        if (scene.imagePath && fs.existsSync(scene.imagePath)) {
-          continue;
-        }
-        const imagePath = path.join(
-          imageDir,
-          `${filePrefix}_scene_${scene.order}.jpg`,
-        );
-        await this.imageService.generateImage(
-          scene.imagePrompt,
-          imagePath,
-          width,
-          height,
-        );
-        await this.prisma.storyScene.update({
-          where: { id: scene.id },
-          data: { imagePath },
-        });
-      }
+      // Get concurrency from env, default to 4
+      const imageConcurrency = parseInt(
+        this.configService.get<string>('IMAGE_DOWNLOAD_CONCURRENCY', '4'),
+      );
+
+      // Filter scenes that need image generation
+      const scenesNeedingImages = scenesWithSsml.filter(
+        (scene) => !scene.imagePath || !fs.existsSync(scene.imagePath),
+      );
+
+      // Use p-map for concurrent image generation
+      await pMap(
+        scenesNeedingImages,
+        async (scene) => {
+          const imagePath = path.join(
+            imageDir,
+            `${filePrefix}_scene_${scene.order}.jpg`,
+          );
+          await this.imageService.generateImage(
+            scene.imagePrompt,
+            imagePath,
+            width,
+            height,
+          );
+          await this.prisma.storyScene.update({
+            where: { id: scene.id },
+            data: { imagePath },
+          });
+        },
+        { concurrency: imageConcurrency },
+      );
 
       // Step 6: Generate TTS using prosody segments for expressive speech
       await this.logMessage(

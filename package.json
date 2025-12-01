@@ -38,6 +38,7 @@
     "edge-tts-universal": "^1.3.3",
     "fluent-ffmpeg": "^2.1.3",
     "openai": "^4.104.0",
+    "p-map": "^7.0.4",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.2"
   },
