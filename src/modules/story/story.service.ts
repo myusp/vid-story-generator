@@ -769,11 +769,11 @@ export class StoryService {
           fs.unlinkSync(videoPath);
         }
       }
-      // Try to remove temp directory if empty
+      // Try to remove temp directory
       try {
-        fs.rmdirSync(projectTmpDir);
+        fs.rmSync(projectTmpDir, { recursive: true, force: true });
       } catch {
-        // Ignore if not empty or other errors
+        // Ignore cleanup errors
       }
 
       // Step 8: Generate SRT
