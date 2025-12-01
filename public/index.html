@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shorts Story Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .login-card, .main-content {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .login-card {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+
+        h1, h2, h3 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .logout-btn {
+            background: #f44336;
+            width: auto;
+            padding: 10px 20px;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .project-card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .project-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .project-card p {
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status.completed {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status.pending {
+            background: #ff9800;
+            color: white;
+        }
+
+        .status.failed {
+            background: #f44336;
+            color: white;
+        }
+
+        .status.processing {
+            background: #2196f3;
+            color: white;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* Enhanced Speaker List Styles */
+        .speaker-container {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .speaker-filters {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .speaker-filters select {
+            padding: 8px;
+            font-size: 13px;
+        }
+
+        .speaker-tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .speaker-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-weight: 600;
+            width: auto;
+        }
+
+        .speaker-tab.active {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .speaker-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .speaker-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #fafafa;
+            transition: all 0.2s;
+        }
+
+        .speaker-item:hover {
+            background: #f0f0f0;
+        }
+
+        .speaker-item.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .speaker-info {
+            flex: 1;
+        }
+
+        .speaker-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .speaker-meta {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .speaker-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .speaker-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            width: auto;
+            transition: all 0.2s;
+        }
+
+        .play-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .play-btn:hover {
+            background: #45a049;
+        }
+
+        .play-btn.playing {
+            background: #f44336;
+        }
+
+        .fav-btn {
+            background: transparent;
+            color: #ff9800;
+            font-size: 18px;
+            padding: 4px 8px;
+        }
+
+        .fav-btn.favorited {
+            color: #ff5722;
+        }
+
+        .speaker-search {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .speaker-search input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: #666;
+            font-weight: 600;
+            width: auto;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            margin-bottom: -2px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .action-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            width: auto;
+        }
+
+        .retry-btn {
+            background: #ff9800;
+            color: white;
+        }
+
+        .logs-btn {
+            background: #2196f3;
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close-modal {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close-modal:hover {
+            color: #333;
+        }
+
+        .log-entry {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+        }
+
+        .log-entry.INFO {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+        }
+
+        .log-entry.ERROR {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .log-entry.WARN {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+
+        .log-time {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .log-message {
+            margin-top: 4px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .log-code {
+            font-size: 11px;
+            color: #888;
+            font-family: monospace;
+        }
+
+        .gender-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        .gender-badge.Female {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .gender-badge.Male {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .sse-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+
+        .sse-status.connected {
+            background: #4caf50;
+        }
+
+        .sse-status.disconnected {
+            background: #f44336;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+
+            .speaker-filters {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-card">
+        <h1>🎬 Shorts Story Generator</h1>
+        <p style="margin-bottom: 30px; color: #666;">Login with your API key</p>
+        
+        <div id="loginError" class="error hidden"></div>
+        
+        <div class="form-group">
+            <label for="apiKey">API Key</label>
+            <input type="password" id="apiKey" placeholder="Enter your API key">
+        </div>
+        
+        <button onclick="login()">Login</button>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="main-content container hidden">
+        <div class="header">
+            <h1>🎬 Shorts Story Generator</h1>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <div id="message" class="hidden"></div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('create')">Create Story</button>
+            <button class="tab" onclick="switchTab('projects')">My Projects</button>
+        </div>
+
+        <!-- Create Story Tab -->
+        <div id="createTab" class="tab-content active">
+            <h2>Create New Story</h2>
+            
+            <form id="storyForm" onsubmit="createStory(event)">
+                <!-- Story Mode Selection -->
+                <div class="form-group">
+                    <label for="storyMode">Story Creation Mode</label>
+                    <select id="storyMode" onchange="updateStoryModeUI()">
+                        <option value="topic">Generate from Topic</option>
+                        <option value="prompt">Generate from Story Prompt</option>
+                        <option value="narrations">Use Existing Narrations</option>
+                    </select>
+                </div>
+
+                <!-- Topic Input (for topic mode) -->
+                <div class="form-group" id="topicGroup">
+                    <label for="topic">Topic *</label>
+                    <input type="text" id="topic" placeholder="e.g., Ayah kurang tidur">
+                </div>
+
+                <!-- Story Prompt Input (for prompt mode) -->
+                <div class="form-group hidden" id="storyPromptGroup">
+                    <label for="storyPromptText">Story Prompt *</label>
+                    <textarea id="storyPromptText" rows="4" placeholder="Describe the story you want to create. AI will generate narrations based on your prompt."></textarea>
+                </div>
+
+                <!-- Existing Narrations (for narrations mode) -->
+                <div class="form-group hidden" id="narrationsGroup">
+                    <label for="existingNarrations">Existing Narrations * (one per line)</label>
+                    <textarea id="existingNarrations" rows="8" placeholder="Scene 1: First narration here...
+Scene 2: Second narration here...
+Scene 3: Third narration here..."></textarea>
+                    <small style="color: #666;">Enter one narration per line. Each line becomes a scene.</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="genre">Genre *</label>
+                        <input type="text" id="genre" required placeholder="e.g., family_comedy">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="language">Language *</label>
+                        <select id="language" required>
+                            <option value="id">Indonesian (id)</option>
+                            <option value="en">English (en)</option>
+                            <option value="zh">Chinese (zh)</option>
+                            <option value="ja">Japanese (ja)</option>
+                            <option value="ko">Korean (ko)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="imageStyle">Image Style</label>
+                        <select id="imageStyle">
+                            <option value="">Default</option>
+                            <option value="realistic">Realistic</option>
+                            <option value="cartoon">Cartoon</option>
+                            <option value="animation_90s">Animation 90s</option>
+                            <option value="ghibli">Ghibli</option>
+                            <option value="anime">Anime</option>
+                            <option value="pixar">Pixar</option>
+                            <option value="watercolor">Watercolor</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="narrativeTone">Narrative Tone</label>
+                        <select id="narrativeTone">
+                            <option value="">Default</option>
+                            <option value="casual">Casual</option>
+                            <option value="formal">Formal</option>
+                            <option value="funny">Funny</option>
+                            <option value="dramatic">Dramatic</option>
+                            <option value="inspirational">Inspirational</option>
+                            <option value="mysterious">Mysterious</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="orientation">Orientation *</label>
+                        <select id="orientation" required>
+                            <option value="PORTRAIT">Portrait (9:16)</option>
+                            <option value="LANDSCAPE">Landscape (16:9)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="totalImages">Total Scenes *</label>
+                        <input type="number" id="totalImages" required value="8" min="3" max="20">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modelProvider">AI Model *</label>
+                    <select id="modelProvider" required>
+                        <option value="gemini">Gemini</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Speaker Voice *</label>
+                    <input type="text" id="selectedSpeaker" readonly placeholder="Select a speaker from the list below">
+                    
+                    <div class="speaker-container" id="speakerContainer">
+                        <div class="speaker-search">
+                            <input type="text" id="speakerSearch" placeholder="Search speakers..." onkeyup="filterSpeakers()">
+                        </div>
+                        
+                        <div class="speaker-filters">
+                            <select id="filterLanguage" onchange="filterSpeakers()">
+                                <option value="">All Languages</option>
+                            </select>
+                            <select id="filterGender" onchange="filterSpeakers()">
+                                <option value="">All Genders</option>
+                                <option value="Female">Female</option>
+                                <option value="Male">Male</option>
+                            </select>
+                            <button type="button" onclick="loadSpeakers()" style="padding: 8px;">🔄 Refresh</button>
+                        </div>
+
+                        <div class="speaker-tabs">
+                            <button type="button" class="speaker-tab active" onclick="switchSpeakerTab('all')">All Voices</button>
+                            <button type="button" class="speaker-tab" onclick="switchSpeakerTab('favorites')">⭐ Favorites</button>
+                        </div>
+
+                        <div id="speakerList" class="speaker-list">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading speakers...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animation Options (Collapsible) -->
+                <div class="form-group">
+                    <label onclick="toggleAnimationOptions()" style="cursor: pointer;">
+                        🎬 Animation Options <span id="animationToggle">(click to expand)</span>
+                    </label>
+                    <div id="animationOptions" class="hidden" style="margin-top: 10px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                        <p style="margin-bottom: 10px; font-size: 13px; color: #666;">Select which animations are allowed (leave empty for all):</p>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-left"> Pan Left</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-right"> Pan Right</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-up"> Pan Up</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-down"> Pan Down</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-slow"> Zoom Slow</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-in"> Zoom In</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-out"> Zoom Out</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="static"> Static</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="fade"> Fade</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn">Create Story</button>
+            </form>
+        </div>
+
+        <!-- Projects Tab -->
+        <div id="projectsTab" class="tab-content">
+            <h2>My Projects <span id="sseStatus" class="sse-status disconnected" title="SSE Status"></span></h2>
+            <button onclick="loadProjects()" style="margin-bottom: 20px; width: auto;">🔄 Refresh Projects</button>
+            
+            <div id="projectsLoading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading projects...</p>
+            </div>
+            
+            <div id="projectsList" class="projects-grid"></div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Project Logs</h2>
+                <span class="close-modal" onclick="closeLogsModal()">&times;</span>
+            </div>
+            <div id="logsContent">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>📋 Project Details</h2>
+                <span class="close-modal" onclick="closeDetailsModal()">&times;</span>
+            </div>
+            <div id="detailsContent">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let API_KEY = '';
+        const API_URL = window.location.origin;
+        let allSpeakers = [];
+        let favorites = JSON.parse(localStorage.getItem('speakerFavorites') || '[]');
+        let currentAudio = null;
+        let currentPlayingBtn = null;
+        let sseConnections = new Map();
+
+        // Login functionality
+        async function login() {
+            const apiKey = document.getElementById('apiKey').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!apiKey) {
+                showError(errorDiv, 'Please enter an API key');
+                return;
+            }
+
+            try {
+                // Test API key by fetching speakers list
+                const response = await fetch(`${API_URL}/speakers`, {
+                    headers: {
+                        'X-API-KEY': apiKey
+                    }
+                });
+
+                if (response.ok) {
+                    API_KEY = apiKey;
+                    localStorage.setItem('apiKey', apiKey);
+                    document.getElementById('loginScreen').classList.add('hidden');
+                    document.getElementById('mainContent').classList.remove('hidden');
+                    loadSpeakers();
+                    loadProjects();
+                } else {
+                    showError(errorDiv, 'Invalid API key');
+                }
+            } catch (error) {
+                showError(errorDiv, 'Failed to connect to server');
+            }
+        }
+
+        function logout() {
+            API_KEY = '';
+            localStorage.removeItem('apiKey');
+            // Close all SSE connections
+            sseConnections.forEach((connection) => connection.close());
+            sseConnections.clear();
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            document.getElementById('apiKey').value = '';
+        }
+
+        // Check for saved API key on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedKey = localStorage.getItem('apiKey');
+            if (savedKey) {
+                document.getElementById('apiKey').value = savedKey;
+                login();
+            }
+        });
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'create') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('createTab').classList.add('active');
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('projectsTab').classList.add('active');
+                loadProjects();
+            }
+        }
+
+        // Speaker tab switching
+        function switchSpeakerTab(tab) {
+            document.querySelectorAll('.speaker-tab').forEach(t => t.classList.remove('active'));
+            if (tab === 'all') {
+                document.querySelector('.speaker-tab:nth-child(1)').classList.add('active');
+            } else {
+                document.querySelector('.speaker-tab:nth-child(2)').classList.add('active');
+            }
+            renderSpeakers(tab === 'favorites');
+        }
+
+        // Load speakers
+        async function loadSpeakers() {
+            const speakerList = document.getElementById('speakerList');
+            speakerList.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading speakers...</p></div>';
+
+            try {
+                const response = await fetch(`${API_URL}/speakers`, {
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to load speakers');
+                
+                allSpeakers = await response.json();
+                
+                // Populate language filter
+                const languages = [...new Set(allSpeakers.map(s => s.locale.split('-')[0]))].sort();
+                const langSelect = document.getElementById('filterLanguage');
+                langSelect.innerHTML = '<option value="">All Languages</option>' +
+                    languages.map(lang => `<option value="${lang}">${lang.toUpperCase()}</option>`).join('');
+                
+                renderSpeakers();
+            } catch (error) {
+                speakerList.innerHTML = '<p style="color: red; text-align: center;">Failed to load speakers</p>';
+            }
+        }
+
+        // Filter speakers
+        function filterSpeakers() {
+            renderSpeakers(document.querySelector('.speaker-tab:nth-child(2)').classList.contains('active'));
+        }
+
+        // Render speakers
+        function renderSpeakers(showFavoritesOnly = false) {
+            const speakerList = document.getElementById('speakerList');
+            const searchTerm = document.getElementById('speakerSearch').value.toLowerCase();
+            const langFilter = document.getElementById('filterLanguage').value;
+            const genderFilter = document.getElementById('filterGender').value;
+
+            let filteredSpeakers = allSpeakers;
+
+            // Apply filters
+            if (searchTerm) {
+                filteredSpeakers = filteredSpeakers.filter(s => 
+                    s.displayName.toLowerCase().includes(searchTerm) ||
+                    s.shortName.toLowerCase().includes(searchTerm) ||
+                    s.locale.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (langFilter) {
+                filteredSpeakers = filteredSpeakers.filter(s => 
+                    s.locale.toLowerCase().startsWith(langFilter.toLowerCase())
+                );
+            }
+
+            if (genderFilter) {
+                filteredSpeakers = filteredSpeakers.filter(s => s.gender === genderFilter);
+            }
+
+            if (showFavoritesOnly) {
+                filteredSpeakers = filteredSpeakers.filter(s => favorites.includes(s.shortName));
+            }
+
+            if (filteredSpeakers.length === 0) {
+                speakerList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No speakers found</p>';
+                return;
+            }
+
+            speakerList.innerHTML = filteredSpeakers.map(speaker => {
+                const isFavorite = favorites.includes(speaker.shortName);
+                const isSelected = document.getElementById('selectedSpeaker').value === speaker.shortName;
+                return `
+                    <div class="speaker-item ${isSelected ? 'selected' : ''}" onclick="selectSpeaker('${speaker.shortName}', this)">
+                        <div class="speaker-info">
+                            <div class="speaker-name">
+                                ${speaker.displayName}
+                                <span class="gender-badge ${speaker.gender}">${speaker.gender}</span>
+                            </div>
+                            <div class="speaker-meta">${speaker.locale} | ${speaker.shortName}</div>
+                        </div>
+                        <div class="speaker-actions" onclick="event.stopPropagation()">
+                            <button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', this)" title="Preview voice">▶</button>
+                            <button class="speaker-btn fav-btn ${isFavorite ? 'favorited' : ''}" onclick="toggleFavorite('${speaker.shortName}', this)" title="Add to favorites">${isFavorite ? '★' : '☆'}</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Select speaker
+        function selectSpeaker(shortName, element) {
+            document.querySelectorAll('.speaker-item').forEach(item => item.classList.remove('selected'));
+            element.classList.add('selected');
+            document.getElementById('selectedSpeaker').value = shortName;
+        }
+
+        // Toggle favorite
+        function toggleFavorite(shortName, btn) {
+            if (favorites.includes(shortName)) {
+                favorites = favorites.filter(f => f !== shortName);
+                btn.textContent = '☆';
+                btn.classList.remove('favorited');
+            } else {
+                favorites.push(shortName);
+                btn.textContent = '★';
+                btn.classList.add('favorited');
+            }
+            localStorage.setItem('speakerFavorites', JSON.stringify(favorites));
+        }
+
+        // Play voice preview (uses browser's speech synthesis as fallback)
+        async function playVoice(shortName, btn) {
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+                if (currentPlayingBtn) {
+                    currentPlayingBtn.textContent = '▶';
+                    currentPlayingBtn.classList.remove('playing');
+                }
+            }
+
+            if (currentPlayingBtn === btn) {
+                currentPlayingBtn = null;
+                return;
+            }
+
+            btn.textContent = '⏹';
+            btn.classList.add('playing');
+            currentPlayingBtn = btn;
+
+            try {
+                // For now, use browser's speech synthesis as a preview
+                // In production, you could call an API endpoint to generate a sample
+                const utterance = new SpeechSynthesisUtterance('Hello! This is a voice preview for short story generation.');
+                utterance.lang = shortName.split('-').slice(0, 2).join('-');
+                utterance.onend = () => {
+                    btn.textContent = '▶';
+                    btn.classList.remove('playing');
+                    currentPlayingBtn = null;
+                };
+                window.speechSynthesis.speak(utterance);
+            } catch (error) {
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+                console.error('Voice preview failed:', error);
+            }
+        }
+
+        // Create story
+        async function createStory(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+
+            const storyMode = document.getElementById('storyMode').value;
+            
+            // Build data based on story mode
+            const data = {
+                storyMode,
+                genre: document.getElementById('genre').value,
+                language: document.getElementById('language').value,
+                speaker: document.getElementById('selectedSpeaker').value,
+                orientation: document.getElementById('orientation').value,
+                modelProvider: document.getElementById('modelProvider').value,
+                imageStyle: document.getElementById("imageStyle").value || null,
+                narrativeTone: document.getElementById("narrativeTone").value || null,
+            };
+
+            // Handle different story modes
+            if (storyMode === 'topic') {
+                data.topic = document.getElementById('topic').value;
+                data.totalImages = parseInt(document.getElementById('totalImages').value);
+                if (!data.topic) {
+                    showMessage('Please enter a topic', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Story';
+                    return;
+                }
+            } else if (storyMode === 'prompt') {
+                data.storyPrompt = document.getElementById('storyPromptText').value;
+                data.totalImages = parseInt(document.getElementById('totalImages').value);
+                if (!data.storyPrompt) {
+                    showMessage('Please enter a story prompt', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Story';
+                    return;
+                }
+            } else if (storyMode === 'narrations') {
+                const narrationsText = document.getElementById('existingNarrations').value;
+                const narrations = narrationsText.split('\n').filter(line => line.trim());
+                if (narrations.length < 2) {
+                    showMessage('Please enter at least 2 narrations (one per line)', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Story';
+                    return;
+                }
+                data.existingNarrations = narrations;
+            }
+
+            // Get allowed animations if any are selected
+            const animationCheckboxes = document.querySelectorAll('input[name="allowedAnimations"]:checked');
+            if (animationCheckboxes.length > 0) {
+                data.allowedAnimations = Array.from(animationCheckboxes).map(cb => cb.value);
+            }
+
+            if (!data.speaker) {
+                showMessage('Please select a speaker', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Story';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/stories/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': API_KEY
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Failed to create story');
+                
+                const project = await response.json();
+                
+                // Trigger generation
+                await fetch(`${API_URL}/stories/${project.id}/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+
+                showMessage('Story project created! Generation started.', 'success');
+                document.getElementById('storyForm').reset();
+                document.getElementById('selectedSpeaker').value = '';
+                updateStoryModeUI(); // Reset UI
+                
+                // Switch to projects tab
+                switchTab('projects');
+            } catch (error) {
+                showMessage('Failed to create story: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Story';
+            }
+        }
+
+        // Load projects
+        async function loadProjects() {
+            const loading = document.getElementById('projectsLoading');
+            const list = document.getElementById('projectsList');
+            
+            loading.classList.remove('hidden');
+            list.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_URL}/stories`, {
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to load projects');
+                
+                const projects = await response.json();
+                
+                loading.classList.add('hidden');
+                
+                if (projects.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; color: #666;">No projects yet. Create your first story!</p>';
+                    return;
+                }
+
+                projects.forEach(project => {
+                    const card = document.createElement('div');
+                    card.className = 'project-card';
+                    card.id = `project-${project.id}`;
+                    
+                    const statusClass = project.status.toLowerCase().includes('completed') ? 'completed' :
+                                      project.status.toLowerCase().includes('failed') ? 'failed' :
+                                      project.status.toLowerCase().includes('pending') ? 'pending' : 'processing';
+                    
+                    const showRetry = statusClass === 'failed' || statusClass === 'processing';
+                    
+                    card.innerHTML = `
+                        <h3>${project.titleGenerated || project.topic}</h3>
+                        <p><strong>Genre:</strong> ${project.genre}</p>
+                        <p><strong>Language:</strong> ${project.language}</p>
+                        <p><strong>Scenes:</strong> ${project.totalImages}</p>
+                        <p><strong>Image Style:</strong> ${project.imageStyle || 'Default'}</p>
+                        <p><strong>Tone:</strong> ${project.narrativeTone || 'Default'}</p>
+                        <span class="status ${statusClass}" id="status-${project.id}">${project.status}</span>
+                        ${project.videoPath ? `
+                            <div style="margin-top: 10px;">
+                                <a href="${API_URL}/stories/${project.id}/download/video" class="action-btn" style="background: #4caf50; text-decoration: none; display: inline-block; margin-right: 10px;">📥 Download Video</a>
+                                <a href="${API_URL}/stories/${project.id}/download/srt" class="action-btn" style="background: #2196f3; text-decoration: none; display: inline-block;">📝 Download SRT</a>
+                            </div>
+                        ` : ''}
+                        <div class="action-buttons">
+                            <button class="action-btn" style="background: #9c27b0;" onclick="viewDetails('${project.id}')">📋 Details</button>
+                            <button class="action-btn logs-btn" onclick="viewLogs('${project.id}')">View Logs</button>
+                            ${showRetry ? `<button class="action-btn retry-btn" onclick="retryGeneration('${project.id}')">Retry</button>` : ''}
+                        </div>
+                    `;
+                    
+                    list.appendChild(card);
+                    
+                    // Subscribe to SSE for processing projects
+                    if (statusClass === 'processing') {
+                        subscribeToProjectLogs(project.id);
+                    }
+                });
+            } catch (error) {
+                loading.classList.add('hidden');
+                list.innerHTML = '<p style="color: red; text-align: center;">Failed to load projects</p>';
+            }
+        }
+
+        // Subscribe to SSE for project logs
+        function subscribeToProjectLogs(projectId) {
+            if (sseConnections.has(projectId)) return;
+            
+            // Get API key from localStorage and add to URL as query parameter
+            // EventSource doesn't support custom headers, so we use query param
+            const apiKey = localStorage.getItem('apiKey');
+            const sseUrl = apiKey 
+                ? `${API_URL}/stories/${projectId}/logs/stream?api-key=${encodeURIComponent(apiKey)}`
+                : `${API_URL}/stories/${projectId}/logs/stream`;
+            
+            const eventSource = new EventSource(sseUrl);
+            
+            eventSource.onopen = () => {
+                document.getElementById('sseStatus').className = 'sse-status connected';
+            };
+            
+            eventSource.onmessage = (event) => {
+                try {
+                    const log = JSON.parse(event.data);
+                    
+                    // Update project status in the UI
+                    if (log.code === 'COMPLETED' || log.code === 'GENERATION_FAILED') {
+                        loadProjects(); // Reload to get final status
+                        eventSource.close();
+                        sseConnections.delete(projectId);
+                    }
+                } catch (e) {
+                    console.error('SSE parse error:', e);
+                }
+            };
+            
+            eventSource.onerror = () => {
+                document.getElementById('sseStatus').className = 'sse-status disconnected';
+                eventSource.close();
+                sseConnections.delete(projectId);
+            };
+            
+            sseConnections.set(projectId, eventSource);
+        }
+
+        // View logs for a project
+        async function viewLogs(projectId) {
+            const modal = document.getElementById('logsModal');
+            const content = document.getElementById('logsContent');
+            
+            modal.style.display = 'block';
+            content.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading logs...</p></div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/stories/${projectId}/logs`, {
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load logs');
+                
+                const logs = await response.json();
+                
+                if (logs.length === 0) {
+                    content.innerHTML = '<p style="text-align: center; color: #666;">No logs available</p>';
+                    return;
+                }
+                
+                content.innerHTML = logs.map(log => {
+                    const date = new Date(log.createdAt);
+                    return `
+                        <div class="log-entry ${log.level}">
+                            <div class="log-time">${date.toLocaleString()}</div>
+                            <div class="log-code">${log.code}</div>
+                            <div class="log-message">${log.message}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                content.innerHTML = '<p style="color: red; text-align: center;">Failed to load logs</p>';
+            }
+        }
+
+        // Close logs modal
+        function closeLogsModal() {
+            document.getElementById('logsModal').style.display = 'none';
+        }
+
+        // Retry generation for a project
+        async function retryGeneration(projectId) {
+            if (!confirm('Retry story generation? This will resume from where it left off.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/stories/${projectId}/retry`, {
+                    method: 'POST',
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to retry generation');
+                
+                showMessage('Generation retry started!', 'success');
+                
+                // Subscribe to SSE for updates
+                subscribeToProjectLogs(projectId);
+                
+                // Refresh projects after a short delay
+                setTimeout(() => loadProjects(), 2000);
+            } catch (error) {
+                showMessage('Failed to retry generation: ' + error.message, 'error');
+            }
+        }
+
+        // View project details
+        async function viewDetails(projectId) {
+            const modal = document.getElementById('detailsModal');
+            const content = document.getElementById('detailsContent');
+            
+            modal.style.display = 'block';
+            content.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading details...</p></div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/stories/${projectId}`, {
+                    headers: {
+                        'X-API-KEY': API_KEY
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load details');
+                
+                const project = await response.json();
+                
+                // Format character descriptions
+                let characterHtml = '<em>Not generated yet</em>';
+                if (project.characterDescriptions) {
+                    try {
+                        const chars = JSON.parse(project.characterDescriptions);
+                        characterHtml = Object.entries(chars).map(([name, desc]) => 
+                            `<div style="margin-bottom: 10px;"><strong>${name}:</strong> ${desc}</div>`
+                        ).join('');
+                    } catch {
+                        characterHtml = project.characterDescriptions.substring(0, 500) + '...';
+                    }
+                }
+
+                // Format scenes
+                let scenesHtml = '<em>No scenes yet</em>';
+                if (project.scenes && project.scenes.length > 0) {
+                    scenesHtml = project.scenes.map(scene => `
+                        <div style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 8px;">
+                            <strong>Scene ${scene.order}:</strong>
+                            <p style="margin: 5px 0;">${scene.narration || '<em>No narration</em>'}</p>
+                            ${scene.imagePrompt ? `<small style="color: #666;"><strong>Image Prompt:</strong> ${scene.imagePrompt.substring(0, 100)}...</small>` : ''}
+                            ${scene.animationShow ? `<br><small style="color: #667eea;"><strong>Animation:</strong> ${scene.animationShow}</small>` : ''}
+                        </div>
+                    `).join('');
+                }
+                
+                content.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h3 style="color: #667eea; margin-bottom: 15px;">📌 Basic Info</h3>
+                            <p><strong>ID:</strong> ${project.id}</p>
+                            <p><strong>Slug:</strong> ${project.projectSlug || 'N/A'}</p>
+                            <p><strong>Topic:</strong> ${project.topic}</p>
+                            <p><strong>Genre:</strong> ${project.genre}</p>
+                            <p><strong>Language:</strong> ${project.language}</p>
+                            <p><strong>Speaker:</strong> ${project.speakerCode}</p>
+                            <p><strong>Orientation:</strong> ${project.orientation}</p>
+                            <p><strong>Total Images:</strong> ${project.totalImages}</p>
+                            <p><strong>Status:</strong> <span class="status ${project.status.toLowerCase()}">${project.status}</span></p>
+                            <p><strong>Created:</strong> ${new Date(project.createdAt).toLocaleString()}</p>
+                            <p><strong>Updated:</strong> ${new Date(project.updatedAt).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <h3 style="color: #667eea; margin-bottom: 15px;">🎨 Style Settings</h3>
+                            <p><strong>Image Style:</strong> ${project.imageStyle || 'Default'}</p>
+                            <p><strong>Narrative Tone:</strong> ${project.narrativeTone || 'Default'}</p>
+                            <p><strong>AI Model:</strong> ${project.modelProvider || 'gemini'}</p>
+                            <p><strong>Story Mode:</strong> ${project.storyMode || 'topic'}</p>
+                            ${project.storyPrompt ? `<p><strong>Story Prompt:</strong> ${project.storyPrompt.substring(0, 200)}${project.storyPrompt.length > 200 ? '...' : ''}</p>` : ''}
+                            ${project.allowedAnimations ? `<p><strong>Allowed Animations:</strong> ${project.allowedAnimations}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">📝 Generated Content</h3>
+                    <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <p><strong>Title:</strong> ${project.titleGenerated || '<em>Not generated</em>'}</p>
+                        <p><strong>Description:</strong> ${project.descriptionGenerated || '<em>Not generated</em>'}</p>
+                        <p><strong>Hashtags:</strong> ${project.hashtagsGenerated || '<em>Not generated</em>'}</p>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">👥 Characters</h3>
+                    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
+                        ${characterHtml}
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">🎬 Scenes (${project.scenes?.length || 0})</h3>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        ${scenesHtml}
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin: 20px 0 15px;">📁 Files</h3>
+                    <div style="background: #fff3e0; padding: 15px; border-radius: 8px;">
+                        <p><strong>Video:</strong> ${project.videoPath || '<em>Not generated</em>'}</p>
+                        <p><strong>Subtitles:</strong> ${project.srtPath || '<em>Not generated</em>'}</p>
+                    </div>
+                `;
+            } catch (error) {
+                content.innerHTML = '<p style="color: red; text-align: center;">Failed to load project details</p>';
+            }
+        }
+
+        // Close details modal
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        // Toggle animation options visibility
+        function toggleAnimationOptions() {
+            const options = document.getElementById('animationOptions');
+            const toggle = document.getElementById('animationToggle');
+            if (options.classList.contains('hidden')) {
+                options.classList.remove('hidden');
+                toggle.textContent = '(click to collapse)';
+            } else {
+                options.classList.add('hidden');
+                toggle.textContent = '(click to expand)';
+            }
+        }
+
+        // Update UI based on story mode selection
+        function updateStoryModeUI() {
+            const mode = document.getElementById('storyMode').value;
+            const topicGroup = document.getElementById('topicGroup');
+            const storyPromptGroup = document.getElementById('storyPromptGroup');
+            const narrationsGroup = document.getElementById('narrationsGroup');
+            const totalImagesGroup = document.getElementById('totalImages').parentElement;
+
+            // Hide all
+            topicGroup.classList.add('hidden');
+            storyPromptGroup.classList.add('hidden');
+            narrationsGroup.classList.add('hidden');
+
+            // Show based on mode
+            if (mode === 'topic') {
+                topicGroup.classList.remove('hidden');
+                totalImagesGroup.style.display = 'block';
+            } else if (mode === 'prompt') {
+                storyPromptGroup.classList.remove('hidden');
+                totalImagesGroup.style.display = 'block';
+            } else if (mode === 'narrations') {
+                narrationsGroup.classList.remove('hidden');
+                totalImagesGroup.style.display = 'none'; // Auto-calculated from narrations
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const logsModal = document.getElementById('logsModal');
+            const detailsModal = document.getElementById('detailsModal');
+            if (event.target === logsModal) {
+                closeLogsModal();
+            }
+            if (event.target === detailsModal) {
+                closeDetailsModal();
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type === 'success' ? 'success' : 'error';
+            messageDiv.textContent = message;
+            messageDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                messageDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showError(element, message) {
+            element.textContent = message;
+            element.classList.remove('hidden');
+            setTimeout(() => {
+                element.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

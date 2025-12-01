@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model StoryProject {
+  id               String      @id @default(uuid())
+  topic            String
+  genre            String
+  language         String
+  speakerCode      String
+  orientation      String
+  totalImages      Int
+  modelProvider    String      @default("gemini")
+  imageStyle       String?
+  narrativeTone    String?
+  projectSlug      String?     // Safe name for file paths (derived from topic)
+  characterDescriptions String? // JSON string containing character descriptions for consistent images
+  storyMode        String?     // 'topic', 'prompt', or 'narrations'
+  storyPrompt      String?     // User-provided story prompt
+  allowedAnimations String?    // JSON array of allowed animation types
+
+  titleGenerated       String?
+  descriptionGenerated String?
+  hashtagsGenerated    String?
+  rawStory             String?
+
+  videoPath        String?
+  srtPath          String?
+
+  status           String @default("PENDING")
+  scenes           StoryScene[]
+  logs             StoryLog[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model StoryScene {
+  id            String       @id @default(uuid())
+  order         Int
+  imagePrompt   String?
+  narration     String?
+  ssml          String?
+  prosodyData   String?      // JSON string containing prosody segments
+  imagePath     String?
+  audioPath     String?
+  startTimeMs   Int?
+  endTimeMs     Int?
+  animationIn   String?
+  animationShow String?
+  animationOut  String?
+
+  project       StoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String
+}
+
+model StoryLog {
+  id          String       @id @default(uuid())
+  level       String
+  code        String
+  message     String
+  meta        String?      // JSON string
+  createdAt   DateTime @default(now())
+
+  project     StoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+}

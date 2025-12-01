@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  vid-story-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vid-story-generator
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Required: AI API Keys
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+      - OPENAI_API_KEYS=${OPENAI_API_KEYS}
+      
+      # AI Configuration
+      - GEMINI_API_URL=${GEMINI_API_URL:-https://generativelanguage.googleapis.com}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-exp}
+      - OPENAI_API_URL=${OPENAI_API_URL:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      
+      # AI Retry Configuration
+      - AI_MAX_RETRIES=${AI_MAX_RETRIES:-3}
+      - AI_RETRY_DELAY_MS=${AI_RETRY_DELAY_MS:-10000}
+      - AI_BATCH_SIZE=${AI_BATCH_SIZE:-4}
+      
+      # Image Generation
+      - POLINATIONS_BASE_URL=${POLINATIONS_BASE_URL:-https://image.pollinations.ai}
+      
+      # Storage paths (inside container)
+      - VIDEO_TMP_DIR=/app/storage/tmp
+      - VIDEO_OUTPUT_DIR=/app/storage/videos
+      - SRT_OUTPUT_DIR=/app/storage/subtitles
+      - IMAGE_OUTPUT_DIR=/app/storage/images
+      - AUDIO_OUTPUT_DIR=/app/storage/audio
+      
+      # Auto-cleanup (0 = disabled, hours)
+      - ASSET_TTL_HOURS=${ASSET_TTL_HOURS:-0}
+      
+      # Application
+      - PORT=3000
+      - NODE_ENV=production
+      
+      # API Authentication
+      - API_KEYS=${API_KEYS}
+      
+      # Database
+      - DATABASE_URL=file:/app/data/dev.db
+    volumes:
+      # Persist SQLite database
+      - vid-story-data:/app/data
+      # Persist generated assets
+      - vid-story-storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  vid-story-data:
+    driver: local
+  vid-story-storage:
+    driver: local
