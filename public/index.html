@@ -1339,8 +1339,8 @@ Scene 3: Third narration here..."></textarea>
             } else if (storyMode === 'narrations') {
                 const narrationsText = document.getElementById('existingNarrations').value;
                 const narrations = narrationsText.split('\n').filter(line => line.trim());
-                if (narrations.length < 1) {
-                    showMessage('Please enter at least 1 narration', 'error');
+                if (narrations.length === 0) {
+                    showMessage('Please enter at least one narration line', 'error');
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Create Story';
                     return;
