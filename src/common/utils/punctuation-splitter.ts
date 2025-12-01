@@ -16,12 +16,16 @@ export interface ProsodySegment {
  */
 export function splitByPunctuation(text: string): string[] {
   // Split by sentence-ending punctuation while keeping the punctuation with the text
-  // Matches: . ! ? ; : ... (and combinations like !? or ?!)
+  // Matches: . ! ? ; : ... (ellipsis) and combinations like !? or ?!
   const segments: string[] = [];
 
   // Regex pattern to split on sentence-ending punctuation
-  // Captures groups ending with . ! ? ; or combinations, followed by space or end
-  const pattern = /([^.!?;:]+[.!?;:]+(?:\s*[.!?;:]+)*)\s*/g;
+  // Handles:
+  // - Single punctuation: . ! ? ; :
+  // - Ellipsis: ... or …
+  // - Combinations: !? ?! !! ??
+  // The pattern captures text followed by punctuation marks
+  const pattern = /([^.!?;:…]+(?:\.{2,}|…|[.!?;:]+(?:\s*[.!?;:]+)*))\s*/g;
 
   let match: RegExpExecArray | null;
   let lastIndex = 0;

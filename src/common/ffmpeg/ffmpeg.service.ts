@@ -155,7 +155,7 @@ export class FfmpegService {
     // 3. Use exact fps to prevent frame timing issues
     // 4. Apply zoompan on already-downscaled image to prevent pixel rounding jitter
     // Using lanczos for best quality and smoothest scaling
-    let filterChain = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1,format=yuv420p,fps=fps=${fps}`;
+    let filterChain = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1,format=yuv420p,fps=${fps}`;
 
     // If no animations, keep it simple - NO minterpolate to avoid shaking
     if (

@@ -90,6 +90,7 @@ export class SpeakersService {
       const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
 
       // Set response headers for audio streaming
+      // Edge TTS always returns audio/mpeg (MP3) format
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Length', audioBuffer.length);
       res.setHeader('Cache-Control', 'public, max-age=3600');

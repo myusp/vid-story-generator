@@ -470,9 +470,13 @@ export class StoryService {
       const height = project.orientation === 'PORTRAIT' ? 3840 : 2160;
 
       // Get concurrency from env, default to 4
-      const imageConcurrency = parseInt(
+      const concurrencyValue = parseInt(
         this.configService.get<string>('IMAGE_DOWNLOAD_CONCURRENCY', '4'),
+        10,
       );
+      // Ensure valid concurrency (fallback to 4 if NaN or invalid)
+      const imageConcurrency =
+        !isNaN(concurrencyValue) && concurrencyValue > 0 ? concurrencyValue : 4;
 
       // Filter scenes that need image generation
       const scenesNeedingImages = scenesWithSsml.filter(
