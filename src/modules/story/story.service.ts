@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createSRT } from 'edge-tts-universal';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiService } from '../../common/ai/ai.service';
 import { FfmpegService } from '../../common/ffmpeg/ffmpeg.service';
@@ -170,44 +171,116 @@ export class StoryService {
 
       const provider =
         (project.modelProvider as 'gemini' | 'openai') || 'gemini';
+      const storyMode = project.storyMode || 'topic';
 
-      // Step 1: Generate metadata (skip if already done)
+      // Parse allowed animations if set
+      let allowedAnimations: string[] | undefined;
+      if (project.allowedAnimations) {
+        try {
+          allowedAnimations = JSON.parse(project.allowedAnimations);
+        } catch {
+          allowedAnimations = undefined;
+        }
+      }
+
+      // Step 1: Generate metadata based on story mode (skip if already done)
       if (project.status === StoryStatus.PENDING || !project.titleGenerated) {
         await this.logMessage(
           projectId,
           'INFO',
           'GENERATING_METADATA',
-          'Generating story metadata...',
+          `Generating story metadata (mode: ${storyMode})...`,
         );
-        const metadata = await this.aiService.generateStoryMetadata(
-          project.topic,
-          project.genre,
-          project.language,
-          provider,
-        );
+
+        let metadata: { title: string; description: string; hashtags: string };
+        let suggestedTopic: string | undefined;
+
+        if (storyMode === 'prompt' && project.storyPrompt) {
+          // For prompt mode: generate all metadata from the prompt
+          const promptMetadata =
+            await this.aiService.generateMetadataFromPrompt(
+              project.storyPrompt,
+              project.genre,
+              project.language,
+              provider,
+            );
+          metadata = promptMetadata;
+          suggestedTopic = promptMetadata.suggestedTopic;
+        } else if (storyMode === 'narrations') {
+          // For narrations mode: generate metadata from the existing narrations
+          const existingScenes = await this.prisma.storyScene.findMany({
+            where: { projectId },
+            orderBy: { order: 'asc' },
+          });
+          const narrationsForMeta = existingScenes
+            .filter((s) => s.narration)
+            .map((s) => s.narration as string);
+
+          if (narrationsForMeta.length > 0) {
+            const narrationMetadata =
+              await this.aiService.generateMetadataFromNarrations(
+                narrationsForMeta,
+                project.genre,
+                project.language,
+                provider,
+              );
+            metadata = narrationMetadata;
+            suggestedTopic = narrationMetadata.suggestedTopic;
+          } else {
+            // Fallback to topic-based generation
+            metadata = await this.aiService.generateStoryMetadata(
+              project.topic,
+              project.genre,
+              project.language,
+              provider,
+            );
+          }
+        } else {
+          // Default: topic mode
+          metadata = await this.aiService.generateStoryMetadata(
+            project.topic,
+            project.genre,
+            project.language,
+            provider,
+          );
+        }
+
+        // Update project with metadata (and topic if it was a placeholder)
+        const updateData: Prisma.StoryProjectUpdateInput = {
+          titleGenerated: metadata.title,
+          descriptionGenerated: metadata.description,
+          hashtagsGenerated: metadata.hashtags,
+          status: StoryStatus.STORY_PROMPT_READY,
+        };
+
+        // Update topic if a better one was suggested
+        if (
+          suggestedTopic &&
+          (!project.topic || project.topic === 'Untitled Story')
+        ) {
+          updateData.topic = suggestedTopic;
+        }
 
         await this.prisma.storyProject.update({
           where: { id: projectId },
-          data: {
-            titleGenerated: metadata.title,
-            descriptionGenerated: metadata.description,
-            hashtagsGenerated: metadata.hashtags,
-            status: StoryStatus.STORY_PROMPT_READY,
-          },
+          data: updateData,
         });
       }
 
-      // Step 2: Generate narrations only (skip if scenes exist with narrations or using existing narrations)
+      // Step 2: Generate/process narrations based on mode
       const existingScenes = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
 
       // Use projectSlug for file naming if available, fallback to projectId
-      const filePrefix = project.projectSlug || projectId;
+      // Refresh project data to get updated topic if changed
+      const updatedProject = await this.prisma.storyProject.findUnique({
+        where: { id: projectId },
+      });
+      const filePrefix = updatedProject?.projectSlug || projectId;
 
-      // Skip narration generation if using 'narrations' mode (already created) or scenes already exist
-      const storyMode = project.storyMode || 'topic';
+      // Process based on story mode
       if (existingScenes.length === 0 || !existingScenes[0].narration) {
         await this.logMessage(
           projectId,
@@ -258,7 +331,9 @@ export class StoryService {
       }
 
       // Step 2.5: Generate character descriptions if not already done
-      let characterDescriptions = project.characterDescriptions;
+      // Use updated project data for topic if it was changed
+      let characterDescriptions = updatedProject?.characterDescriptions;
+      const topicForCharacters = updatedProject?.topic || project.topic;
       if (!characterDescriptions) {
         await this.logMessage(
           projectId,
@@ -275,7 +350,7 @@ export class StoryService {
 
         characterDescriptions =
           await this.aiService.generateCharacterDescriptions(
-            project.topic,
+            topicForCharacters,
             allNarrations,
             project.imageStyle || '',
             provider,
@@ -368,10 +443,11 @@ export class StoryService {
             },
           ];
 
-          // Generate animations
+          // Generate animations with allowed animations filter
           const animations = await this.aiService.generateAnimations(
             scene.narration,
             provider,
+            allowedAnimations, // Pass allowed animations filter
           );
 
           await this.prisma.storyScene.update({

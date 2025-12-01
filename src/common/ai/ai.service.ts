@@ -70,6 +70,11 @@ export class AiService {
   private readonly retryDelay: number;
   private readonly batchSize: number;
 
+  // Constants for improved maintainability
+  private static readonly TOPIC_MAX_LENGTH = 50;
+  private static readonly CONTEXT_PREVIEW_LENGTH = 200;
+  private static readonly PREVIOUS_SCENES_CONTEXT_COUNT = 2;
+
   constructor(
     private configService: ConfigService,
     private apiKeyRolling: ApiKeyRollingService,
@@ -96,6 +101,127 @@ Return ONLY a JSON object in this exact format:
   "title": "engaging title here",
   "description": "brief description here",
   "hashtags": "#hashtag1 #hashtag2 #hashtag3"
+}`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    return JSON.parse(this.extractJSON(response));
+  }
+
+  /**
+   * Generate metadata from a story prompt (for prompt mode)
+   * AI generates title, description, hashtags, and suggested topic based on the story prompt
+   */
+  async generateMetadataFromPrompt(
+    storyPrompt: string,
+    genre: string,
+    language: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<StoryMetadata & { suggestedTopic: string }> {
+    const prompt = `Based on this story outline, generate metadata for a short video:
+
+Story Outline: "${storyPrompt}"
+Genre: ${genre}
+Language: ${language}
+
+Generate:
+1. A catchy title that captures the story essence
+2. A compelling description/summary
+3. Relevant hashtags
+4. A short topic phrase (max ${AiService.TOPIC_MAX_LENGTH} characters) that summarizes the main theme
+
+Return ONLY a JSON object in this exact format:
+{
+  "title": "engaging title here in ${language}",
+  "description": "brief description here in ${language}",
+  "hashtags": "#hashtag1 #hashtag2 #hashtag3",
+  "suggestedTopic": "short topic phrase"
+}`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    return JSON.parse(this.extractJSON(response));
+  }
+
+  /**
+   * Split user-provided text into scenes (for narrations mode)
+   * AI analyzes the text and splits it into logical scene narrations
+   */
+  async splitTextIntoScenes(
+    userText: string,
+    targetSceneCount: number,
+    language: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<NarrationOnly[]> {
+    const prompt = `You are given a story text. Your task is to split it into ${targetSceneCount} logical scenes for a short video.
+
+Story Text:
+"${userText}"
+
+Language: ${language}
+
+Rules:
+1. Split the text into exactly ${targetSceneCount} scenes
+2. Each scene should be a natural paragraph that flows when spoken
+3. Maintain the original story's flow and meaning
+4. Each scene narration should be suitable for a single video scene (5-15 seconds when spoken)
+5. Keep the narrations in the same language as the original text (${language})
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "narration": "first scene narration in ${language}"
+  },
+  {
+    "order": 2,
+    "narration": "second scene narration in ${language}"
+  }
+]
+
+Create exactly ${targetSceneCount} scenes.`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const scenes = JSON.parse(this.extractJSON(response));
+
+    return scenes.map((item: any, index: number) => ({
+      order: item.order || index + 1,
+      narration: item.narration,
+    }));
+  }
+
+  /**
+   * Generate metadata from existing narrations (for narrations mode)
+   * AI analyzes the narrations and generates title, description, etc.
+   */
+  async generateMetadataFromNarrations(
+    narrations: string[],
+    genre: string,
+    language: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<StoryMetadata & { suggestedTopic: string }> {
+    const narrationsText = narrations
+      .map((n, i) => `Scene ${i + 1}: ${n}`)
+      .join('\n');
+
+    const prompt = `Based on these narrations, generate metadata for a short video:
+
+Narrations:
+${narrationsText}
+
+Genre: ${genre}
+Language: ${language}
+
+Generate:
+1. A catchy title that captures the story essence
+2. A compelling description/summary
+3. Relevant hashtags
+4. A short topic phrase (max ${AiService.TOPIC_MAX_LENGTH} characters) that summarizes the main theme
+
+Return ONLY a JSON object in this exact format:
+{
+  "title": "engaging title here in ${language}",
+  "description": "brief description here in ${language}",
+  "hashtags": "#hashtag1 #hashtag2 #hashtag3",
+  "suggestedTopic": "short topic phrase"
 }`;
 
     const response = await this.callAIWithRetry(prompt, provider);
@@ -222,7 +348,8 @@ The descriptions should be detailed enough to generate consistent images across 
   }
 
   /**
-   * Step 2: Generate image prompts in batches
+   * Step 2: Generate image prompts in batches with context from previous scenes
+   * Each scene gets context from the previous scene's narration and image prompt for continuity
    */
   async generateImagePromptsBatch(
     narrations: Array<{ order: number; narration: string }>,
@@ -239,12 +366,17 @@ The descriptions should be detailed enough to generate consistent images across 
         `Processing image prompts batch ${Math.floor(i / this.batchSize) + 1}: scenes ${batch.map((n) => n.order).join(', ')}`,
       );
 
+      // Get context from previous scenes for continuity
+      const previousContext =
+        i > 0 ? results.slice(-AiService.PREVIOUS_SCENES_CONTEXT_COUNT) : [];
+
       try {
-        const batchResults = await this.generateImagePromptBatch(
+        const batchResults = await this.generateImagePromptBatchWithContext(
           batch,
           imageStyle,
           provider,
           characterDescriptions,
+          previousContext,
         );
 
         // Create a map for O(1) lookups
@@ -260,11 +392,15 @@ The descriptions should be detailed enough to generate consistent images across 
             this.logger.warn(
               `Missing result for scene ${narration.order}, generating individually`,
             );
-            const singlePrompt = await this.generateImagePrompt(
+            // Get previous scene context for individual generation
+            const prevScene =
+              results.length > 0 ? results[results.length - 1] : null;
+            const singlePrompt = await this.generateImagePromptWithContext(
               narration.narration,
               imageStyle,
               provider,
               characterDescriptions,
+              prevScene,
             );
             results.push({
               order: narration.order,
@@ -276,13 +412,16 @@ The descriptions should be detailed enough to generate consistent images across 
         this.logger.warn(
           `Batch failed for scenes ${batch.map((n) => n.order).join(', ')}, falling back to individual generation: ${error.message}`,
         );
-        // Fallback: generate each one individually
+        // Fallback: generate each one individually with context
         for (const narration of batch) {
-          const singlePrompt = await this.generateImagePrompt(
+          const prevScene =
+            results.length > 0 ? results[results.length - 1] : null;
+          const singlePrompt = await this.generateImagePromptWithContext(
             narration.narration,
             imageStyle,
             provider,
             characterDescriptions,
+            prevScene,
           );
           results.push({
             order: narration.order,
@@ -295,11 +434,12 @@ The descriptions should be detailed enough to generate consistent images across 
     return results.sort((a, b) => a.order - b.order);
   }
 
-  private async generateImagePromptBatch(
+  private async generateImagePromptBatchWithContext(
     narrations: Array<{ order: number; narration: string }>,
     imageStyle: string,
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
+    previousContext?: ImagePromptData[],
   ): Promise<ImagePromptData[]> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
     const narrationsText = narrations
@@ -311,21 +451,31 @@ The descriptions should be detailed enough to generate consistent images across 
       ? `\n\nCHARACTER DESCRIPTIONS (use these for consistent character appearances):\n${characterDescriptions}\n`
       : '';
 
+    // Include previous scene context for continuity
+    let previousSceneContext = '';
+    if (previousContext && previousContext.length > 0) {
+      previousSceneContext = `\n\nPREVIOUS SCENES (for continuity - maintain visual consistency):\n${previousContext.map((p) => `Scene ${p.order} image prompt: "${p.imagePrompt.substring(0, AiService.CONTEXT_PREVIEW_LENGTH)}..."`).join('\n')}\n`;
+    }
+
     const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
-${characterContext}
+${characterContext}${previousSceneContext}
 ${narrationsText}
 
 For EACH scene listed above, create a prompt that includes:
 - Main subject/characters (use the character descriptions above for consistency if they appear in the scene)
-- Setting/environment
+- Setting/environment (maintain consistency with previous scenes if continuing the same location)
 - Mood/atmosphere
 - Visual details
-- Composition
+- Composition (consider the flow from previous scenes)
 
-IMPORTANT: 
+IMPORTANT RULES FOR VISUAL CONTINUITY:
 1. You MUST return a result for EACH scene with the EXACT order number specified above.
 2. If a character from the character descriptions appears in the scene, use their exact visual description.
 3. Keep character appearances consistent across all scenes.
+4. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration (side view, 3/4 view, etc.)
+5. Characters should be DOING something related to the narration, not just standing/posing.
+6. Maintain visual continuity with the previous scenes - if a scene continues in the same location, keep the setting consistent.
+7. Match the camera angle and perspective to the story action (e.g., if someone is walking, show them from the side; if they're looking at something, show what they see).
 
 Return ONLY a JSON array in this exact format (one entry for EACH scene):
 [
@@ -347,6 +497,49 @@ Generate exactly ${narrations.length} results, one for each scene.`;
   }
 
   /**
+   * Step 2b: Generate image prompt for a single narration with context from previous scene (fallback)
+   */
+  async generateImagePromptWithContext(
+    narration: string,
+    imageStyle: string,
+    provider: 'gemini' | 'openai',
+    characterDescriptions?: string,
+    previousScene?: ImagePromptData | null,
+  ): Promise<string> {
+    const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
+    const characterContext = characterDescriptions
+      ? `\n\nCHARACTER DESCRIPTIONS (use these for consistent character appearances):\n${characterDescriptions}\n`
+      : '';
+
+    let previousContext = '';
+    if (previousScene) {
+      previousContext = `\n\nPREVIOUS SCENE (for continuity):\nScene ${previousScene.order} image prompt: "${previousScene.imagePrompt}"\n`;
+    }
+
+    const prompt = `Based on this narration: "${narration}"
+${characterContext}${previousContext}
+Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
+
+The prompt should be in English and describe:
+- Main subject/characters (use the character descriptions above if they appear in this scene)
+- Setting/environment (maintain consistency with previous scene if continuing the same location)
+- Mood/atmosphere
+- Visual details
+- Composition
+
+IMPORTANT RULES:
+1. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration.
+2. Characters should be DOING something related to the narration, not just standing/posing.
+3. Maintain visual continuity with the previous scene if applicable.
+4. Match the camera angle to the story action.
+
+Return ONLY the image prompt as plain text, no JSON.`;
+
+    return await this.callAIWithRetry(prompt, provider);
+  }
+
+  /**
+   * Legacy method for backwards compatibility
    * Step 2b: Generate image prompt for a single narration (fallback)
    */
   async generateImagePrompt(
@@ -355,25 +548,13 @@ Generate exactly ${narrations.length} results, one for each scene.`;
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
   ): Promise<string> {
-    const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
-    const characterContext = characterDescriptions
-      ? `\n\nCHARACTER DESCRIPTIONS (use these for consistent character appearances):\n${characterDescriptions}\n`
-      : '';
-
-    const prompt = `Based on this narration: "${narration}"
-${characterContext}
-Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
-
-The prompt should be in English and describe:
-- Main subject/characters (use the character descriptions above if they appear in this scene)
-- Setting/environment
-- Mood/atmosphere
-- Visual details
-- Composition
-
-Return ONLY the image prompt as plain text, no JSON.`;
-
-    return await this.callAIWithRetry(prompt, provider);
+    return this.generateImagePromptWithContext(
+      narration,
+      imageStyle,
+      provider,
+      characterDescriptions,
+      null,
+    );
   }
 
   /**
@@ -578,68 +759,133 @@ Return ONLY a JSON array with SSML for each scene:
   /**
    * Step 4: Determine animations for a scene
    * Uses enhanced Ken Burns effects for more engaging video
+   * @param allowedAnimations - Optional array of allowed animation types to use
    */
   async generateAnimations(
     narration: string,
     provider: 'gemini' | 'openai',
+    allowedAnimations?: string[],
   ): Promise<AnimationData> {
+    // Default all available animations
+    const allShowAnimations = [
+      'pan-left',
+      'pan-right',
+      'pan-up',
+      'pan-down',
+      'pan-diagonal-left',
+      'pan-diagonal-right',
+      'zoom-slow',
+      'zoom-in',
+      'zoom-out',
+      'zoom-pan-left',
+      'zoom-pan-right',
+    ];
+
+    const allInOutAnimations = ['fade', 'zoom-in', 'zoom-out', 'none'];
+
+    // Filter animations based on allowed list if provided
+    let availableShowAnimations = allShowAnimations;
+    let availableInOutAnimations = allInOutAnimations;
+
+    if (allowedAnimations && allowedAnimations.length > 0) {
+      availableShowAnimations = allShowAnimations.filter((a) =>
+        allowedAnimations.includes(a),
+      );
+      availableInOutAnimations = allInOutAnimations.filter((a) =>
+        allowedAnimations.includes(a),
+      );
+
+      // If no show animations are allowed, default to zoom-slow
+      if (availableShowAnimations.length === 0) {
+        availableShowAnimations = ['zoom-slow'];
+      }
+      // If no in/out animations are allowed, default to fade
+      if (availableInOutAnimations.length === 0) {
+        availableInOutAnimations = ['fade'];
+      }
+    }
+
+    const inOutAnimationsList = availableInOutAnimations.join(', ');
+
     const prompt = `Based on this narration: "${narration}"
 
-Suggest appropriate Ken Burns style animations for the image in this scene. Choose from these options:
+Suggest appropriate Ken Burns style animations for the image in this scene. 
 
-- animationIn (entrance): fade, zoom-in, zoom-out, none
+Available animation options (you MUST choose from these):
+
+- animationIn (entrance): ${inOutAnimationsList}
 - animationShow (main movement - ALWAYS use one of these for engaging video):
-  * pan-left: Camera moves from right to left - good for action, movement
-  * pan-right: Camera moves from left to right - good for journey, progress
-  * pan-up: Camera moves from bottom to top - good for revealing, inspiration
-  * pan-down: Camera moves from top to bottom - good for descending, suspense
-  * pan-diagonal-left: Diagonal movement top-right to bottom-left - dynamic
-  * pan-diagonal-right: Diagonal movement top-left to bottom-right - dynamic
-  * zoom-slow: Gentle zoom in - good for focus, intimacy
-  * zoom-in: Dramatic zoom in - good for climax, emphasis
-  * zoom-out: Zoom out - good for reveal, context
-  * zoom-pan-left: Zoom while panning left - very dynamic action
-  * zoom-pan-right: Zoom while panning right - very dynamic action
-- animationOut (exit): fade, zoom-in, zoom-out, none
+  * ${availableShowAnimations.map((a) => `${a}: ${this.getAnimationDescription(a)}`).join('\n  * ')}
+- animationOut (exit): ${inOutAnimationsList}
 
 IMPORTANT: 
 - ALWAYS include animationShow for every scene to keep viewers engaged
 - Vary animations between scenes - don't repeat the same animation consecutively
 - Match animation to mood: action=pan/zoom-pan, suspense=zoom-slow, reveal=zoom-out, etc.
+- ONLY use animations from the lists above
 
 Return ONLY a JSON object:
 {
   "animationIn": "fade",
-  "animationShow": "pan-right",
+  "animationShow": "${availableShowAnimations[0]}",
   "animationOut": "fade"
 }`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const animations = JSON.parse(this.extractJSON(response));
 
-    // Ensure animationShow always has a value for engaging video
+    // Validate that returned animations are in the allowed list
+    let animationIn = animations.animationIn || 'fade';
+    let animationShow = animations.animationShow;
+    let animationOut = animations.animationOut || 'fade';
+
+    // Ensure animations are from allowed list
+    if (!availableInOutAnimations.includes(animationIn)) {
+      animationIn = availableInOutAnimations[0] || 'fade';
+    }
+    if (!availableInOutAnimations.includes(animationOut)) {
+      animationOut = availableInOutAnimations[0] || 'fade';
+    }
     if (
-      !animations.animationShow ||
-      animations.animationShow === 'none' ||
-      animations.animationShow === 'static'
+      !animationShow ||
+      animationShow === 'none' ||
+      animationShow === 'static' ||
+      !availableShowAnimations.includes(animationShow)
     ) {
-      const defaultAnimations = [
-        'pan-left',
-        'pan-right',
-        'pan-up',
-        'pan-down',
-        'zoom-slow',
-        'zoom-in',
-      ];
-      animations.animationShow =
-        defaultAnimations[Math.floor(Math.random() * defaultAnimations.length)];
+      // Pick a random allowed animation
+      animationShow =
+        availableShowAnimations[
+          Math.floor(Math.random() * availableShowAnimations.length)
+        ];
     }
 
     return {
-      animationIn: animations.animationIn || 'fade',
-      animationShow: animations.animationShow,
-      animationOut: animations.animationOut || 'fade',
+      animationIn,
+      animationShow,
+      animationOut,
     };
+  }
+
+  private getAnimationDescription(animation: string): string {
+    const descriptions: Record<string, string> = {
+      'pan-left': 'Camera moves from right to left - good for action, movement',
+      'pan-right':
+        'Camera moves from left to right - good for journey, progress',
+      'pan-up':
+        'Camera moves from bottom to top - good for revealing, inspiration',
+      'pan-down':
+        'Camera moves from top to bottom - good for descending, suspense',
+      'pan-diagonal-left':
+        'Diagonal movement top-right to bottom-left - dynamic',
+      'pan-diagonal-right':
+        'Diagonal movement top-left to bottom-right - dynamic',
+      'zoom-slow': 'Gentle zoom in - good for focus, intimacy',
+      'zoom-in': 'Dramatic zoom in - good for climax, emphasis',
+      'zoom-out': 'Zoom out - good for reveal, context',
+      'zoom-pan-left': 'Zoom while panning left - very dynamic action',
+      'zoom-pan-right': 'Zoom while panning right - very dynamic action',
+    };
+    return descriptions[animation] || animation;
   }
 
   async generateScenes(
