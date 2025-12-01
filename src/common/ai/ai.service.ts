@@ -502,22 +502,32 @@ IMPORTANT RULES FOR VISUAL CONTINUITY:
 7. Match the camera angle and perspective to the story action (e.g., if someone is walking, show them from the side; if they're looking at something, show what they see).`;
 
     const educationalPromptRules = `
-For EACH scene listed above, create a prompt for an EDUCATIONAL/EXPLAINER illustration that includes:
-- Main concept or subject being explained (diagrams, infographics, conceptual illustrations)
-- Visual metaphors or representations of abstract concepts
+For EACH scene listed above, create a UNIQUE and VARIED prompt for an EDUCATIONAL/EXPLAINER illustration.
+
+CRITICAL RULES FOR VARIETY:
+1. Each scene MUST have a DIFFERENT visual approach - DO NOT repeat the same subject/object across scenes.
+2. If the topic involves a concept (like "brain rot"), show DIFFERENT aspects each scene:
+   - Scene 1 might show: a smartphone with social media icons
+   - Scene 2 might show: a clock with attention span visualization  
+   - Scene 3 might show: a dopamine molecule and reward pathway
+   - Scene 4 might show: a comparison of activities (reading vs scrolling)
+3. Use DIVERSE visual metaphors - not the same metaphor repeated.
+
+For EACH scene, create a prompt that includes:
+- A UNIQUE visual representation specific to THAT scene's narration
+- Different objects, scenarios, or metaphors than previous scenes
 - Clean, clear composition focused on the educational message
-- Supporting visual elements (icons, symbols, text labels if needed)
 - Appropriate background that doesn't distract from the main concept
 
 IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
 1. You MUST return a result for EACH scene with the EXACT order number specified above.
-2. DO NOT include human characters or people - focus on concepts, objects, diagrams, and illustrations.
-3. Use visual metaphors and symbolic representations to explain concepts.
-4. Keep the visual style clean and professional, suitable for educational content.
-5. Include relevant icons, symbols, or simplified diagrams that help explain the concept.
-6. Maintain visual consistency across scenes (same color scheme, style, visual language).
-7. The illustration should be self-explanatory and support the narration text.
-8. Think like an infographic designer - clarity and understanding are the priority.`;
+2. DO NOT include human characters, people, or faces.
+3. DO NOT include any text, labels, words, letters, or numbers in the image.
+4. Each scene MUST have a DIFFERENT main subject/object - avoid repetition.
+5. Use VARIED visual metaphors and symbolic representations.
+6. Maintain visual style consistency (color scheme) but VARY the content.
+7. Think creatively - each scene should surprise with a fresh perspective on the topic.
+8. Focus on objects, abstract shapes, nature elements, technology items, or conceptual art.`;
 
     const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
 ${characterContext}${previousSceneContext}
@@ -579,21 +589,23 @@ IMPORTANT RULES:
 1. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration.
 2. Characters should be DOING something related to the narration, not just standing/posing.
 3. Maintain visual continuity with the previous scene if applicable.
-4. Match the camera angle to the story action.`;
+4. Match the camera angle to the story action.
+5. DO NOT include any text, labels, words, letters, or numbers in the image.`;
 
     const educationalPromptContent = `
-The prompt should be in English and describe an EDUCATIONAL ILLUSTRATION:
-- Main concept or subject being explained (diagrams, infographics, conceptual illustrations)
+The prompt should be in English and describe a UNIQUE EDUCATIONAL ILLUSTRATION:
+- A specific visual representation of THIS scene's narration content
 - Visual metaphors or representations of abstract concepts
 - Clean, clear composition focused on the educational message
-- Supporting visual elements (icons, symbols, text labels if needed)
+- Objects, abstract shapes, nature elements, or technology items
 
 IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
-1. DO NOT include human characters or people - focus on concepts, objects, diagrams, and illustrations.
-2. Use visual metaphors and symbolic representations to explain concepts.
-3. Keep the visual style clean and professional, suitable for educational content.
-4. Include relevant icons, symbols, or simplified diagrams that help explain the concept.
-5. The illustration should be self-explanatory and support the narration text.`;
+1. DO NOT include human characters, people, or faces.
+2. DO NOT include any text, labels, words, letters, or numbers in the image.
+3. Use visual metaphors and symbolic representations to explain concepts.
+4. Make this scene visually DIFFERENT from previous scenes - use varied subjects.
+5. The illustration should be self-explanatory and support the narration text.
+6. Focus on unique objects or metaphors that haven't been used in previous scenes.`;
 
     const prompt = `Based on this narration: "${narration}"
 ${characterContext}${previousContext}
