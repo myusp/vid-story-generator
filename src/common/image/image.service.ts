@@ -25,17 +25,19 @@ export class ImageService {
     // Configure axios-retry with exponential backoff
     axiosRetry(this.axiosInstance, {
       retries: 5, // Retry up to 5 times
+      shouldResetTimeout: true, // Reset timeout for each retry
       retryDelay: (r, e) => axiosRetry.exponentialDelay(r, e, 3000),
       retryCondition: (error) => {
-        // Retry on network errors or 5xx status codes (including 502)
+        // Retry on network errors, timeouts, or 5xx status codes
         return (
           axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+          error.code === 'ECONNABORTED' ||
           (error.response?.status >= 500 && error.response?.status <= 599)
         );
       },
       onRetry: (retryCount, error) => {
         this.logger.warn(
-          `Retry attempt ${retryCount} for image generation. Error: ${error.message}`,
+          `Retry attempt ${retryCount} for image generation. Error: ${error.message} (Code: ${error.code})`,
         );
       },
     });
