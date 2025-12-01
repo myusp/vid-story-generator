@@ -164,7 +164,7 @@ Rules:
 3. Maintain the original story's flow and meaning
 4. Each scene narration should be suitable for a single video scene (5-15 seconds when spoken)
 5. Keep the narrations in the same language as the original text (${language})
-6. Use simple, clear language that a 10-year-old can understand
+6. Use VERY SIMPLE language suitable for a 10-year-old child
 7. Avoid poetic, flowery, or hyperbolic expressions
 8. Use short, direct sentences with common words
 
@@ -249,13 +249,13 @@ Return ONLY a JSON object in this exact format:
 
 Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
 
-IMPORTANT LANGUAGE RULES:
-- Use simple, clear language that a 10-year-old can understand
-- Avoid poetic, flowery, or hyperbolic expressions
-- Use short, direct sentences
-- Choose common words over fancy or complex vocabulary
-- Be conversational and natural, not dramatic or exaggerated
-- Keep sentences concise and easy to follow
+IMPORTANT LANGUAGE RULES (STRICT):
+- Use VERY SIMPLE language suitable for a 10-year-old child.
+- DO NOT use complex words, metaphors, or flowery language.
+- DO NOT use hyperbolic expressions (e.g., "shattering the silence", "unimaginable beauty").
+- Keep sentences SHORT and DIRECT.
+- Write as if you are talking to a friend, casually and naturally.
+- Avoid dramatic flair unless specifically requested.
 
 Return ONLY a JSON array in this exact format:
 [
@@ -301,13 +301,13 @@ Style: ${toneDescription}
 Generate ONLY the narration text for each scene. Each narration should be a single paragraph that flows naturally when spoken.
 Make it engaging and suitable for shorts format.
 
-IMPORTANT LANGUAGE RULES:
-- Use simple, clear language that a 10-year-old can understand
-- Avoid poetic, flowery, or hyperbolic expressions
-- Use short, direct sentences
-- Choose common words over fancy or complex vocabulary
-- Be conversational and natural, not dramatic or exaggerated
-- Keep sentences concise and easy to follow
+IMPORTANT LANGUAGE RULES (STRICT):
+- Use VERY SIMPLE language suitable for a 10-year-old child.
+- DO NOT use complex words, metaphors, or flowery language.
+- DO NOT use hyperbolic expressions (e.g., "shattering the silence", "unimaginable beauty").
+- Keep sentences SHORT and DIRECT.
+- Write as if you are talking to a friend, casually and naturally.
+- Avoid dramatic flair unless specifically requested.
 
 Return ONLY a JSON array in this exact format:
 [
@@ -577,9 +577,8 @@ Return ONLY the image prompt as plain text, no JSON.`;
   }
 
   /**
-   * Step 3: Generate prosody segments in batches for expressive speech
-   * Edge-tts-universal supports prosody options (rate, volume, pitch) per synthesis call.
-   * We split narration into segments with different prosody settings for expressive delivery.
+   * Step 3: Generate prosody segments based on punctuation
+   * Replaces AI-based splitting to ensure logical pauses at punctuation marks
    */
   async generateProsodyBatch(
     narrations: Array<{ order: number; narration: string }>,
@@ -588,68 +587,28 @@ Return ONLY the image prompt as plain text, no JSON.`;
   ): Promise<ProsodyData[]> {
     const results: ProsodyData[] = [];
 
-    // Process in batches
-    for (let i = 0; i < narrations.length; i += this.batchSize) {
-      const batch = narrations.slice(i, i + this.batchSize);
-      this.logger.log(
-        `Processing prosody batch ${Math.floor(i / this.batchSize) + 1}: scenes ${batch.map((n) => n.order).join(', ')}`,
-      );
-
-      try {
-        const batchResults = await this.generateProsodyBatchInternal(
-          batch,
-          narrativeTone,
-          provider,
-        );
-
-        // Create a map for O(1) lookups
-        const resultMap = new Map(batchResults.map((r) => [r.order, r]));
-
-        // Validate and match back to original narrations
-        for (const narration of batch) {
-          const result = resultMap.get(narration.order);
-          if (result && result.segments && result.segments.length > 0) {
-            results.push(result);
-          } else {
-            // Fallback: create simple prosody data
-            this.logger.warn(
-              `Missing prosody result for scene ${narration.order}, using default`,
-            );
-            results.push({
-              order: narration.order,
-              segments: [
-                {
-                  text: narration.narration,
-                  rate: '+0%',
-                  volume: '+0%',
-                  pitch: '+0Hz',
-                },
-              ],
-            });
-          }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `Prosody batch failed for scenes ${batch.map((n) => n.order).join(', ')}, using defaults: ${error.message}`,
-        );
-        // Fallback: create simple prosody data for each
-        for (const narration of batch) {
-          results.push({
-            order: narration.order,
-            segments: [
-              {
-                text: narration.narration,
-                rate: '+0%',
-                volume: '+0%',
-                pitch: '+0Hz',
-              },
-            ],
-          });
-        }
-      }
+    for (const item of narrations) {
+      const segments = this.splitTextByPunctuation(item.narration);
+      results.push({
+        order: item.order,
+        segments: segments.map((text) => ({
+          text,
+          rate: '+0%',
+          volume: '+0%',
+          pitch: '+0Hz',
+        })),
+      });
     }
 
     return results.sort((a, b) => a.order - b.order);
+  }
+
+  private splitTextByPunctuation(text: string): string[] {
+    // Split by punctuation marks that indicate a pause, keeping the punctuation
+    // Matches: word sequences ending with punctuation, or the end of the string
+    // Punctuation: . , ! ? ; :
+    const parts = text.match(/[^,.;!?]+[,.;!?]+|[^,.;!?]+$/g) || [text];
+    return parts.map((p) => p.trim()).filter((p) => p.length > 0);
   }
 
   private async generateProsodyBatchInternal(

@@ -19,13 +19,13 @@ export class ImageService {
 
     // Create axios instance with retry configuration
     this.axiosInstance = axios.create({
-      timeout: 60000,
+      timeout: 1000 * 60 * 2,
     });
 
     // Configure axios-retry with exponential backoff
     axiosRetry(this.axiosInstance, {
       retries: 5, // Retry up to 5 times
-      retryDelay: (r, e) => axiosRetry.exponentialDelay(r, e, 3),
+      retryDelay: (r, e) => axiosRetry.exponentialDelay(r, e, 3000),
       retryCondition: (error) => {
         // Retry on network errors or 5xx status codes (including 502)
         return (

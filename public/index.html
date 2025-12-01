@@ -720,6 +720,13 @@ Scene 3: Third narration here..."></textarea>
                             <button type="button" class="speaker-tab" onclick="switchSpeakerTab('favorites')">⭐ Favorites</button>
                         </div>
 
+                        <div style="padding: 10px; background: #e3f2fd; border-bottom: 1px solid #e0e0e0;">
+                            <label class="checkbox-label" title="Connects directly to Microsoft Edge TTS servers from your browser">
+                                <input type="checkbox" id="useClientSideTTS"> 
+                                Use Client-Side Direct Streaming (Experimental)
+                            </label>
+                        </div>
+
                         <div id="speakerList" class="speaker-list">
                             <div class="loading">
                                 <div class="spinner"></div>
@@ -1000,8 +1007,195 @@ Scene 3: Third narration here..."></textarea>
             localStorage.setItem('speakerFavorites', JSON.stringify(favorites));
         }
 
+        // Edge TTS Client for direct browser streaming
+        class EdgeTTSClient {
+            constructor() {
+                this.ws = null;
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.audioQueue = [];
+                this.isPlaying = false;
+                this.nextStartTime = 0;
+            }
+
+            async play(text, voice, onStart, onEnd, onError) {
+                if (this.ws) {
+                    this.ws.close();
+                }
+
+                // Resume audio context if suspended (browser policy)
+                if (this.audioContext.state === 'suspended') {
+                    await this.audioContext.resume();
+                }
+
+                const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+                const url = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}`;
+                
+                this.ws = new WebSocket(url);
+                this.nextStartTime = this.audioContext.currentTime;
+                
+                const requestId = this.generateRequestId();
+                const timestamp = new Date().toString();
+
+                this.ws.onopen = () => {
+                    const config = {
+                        context: {
+                            synthesis: {
+                                audio: {
+                                    metadataoptions: {
+                                        sentenceBoundaryEnabled: "false",
+                                        wordBoundaryEnabled: "false"
+                                    },
+                                    outputFormat: "audio-24khz-48kbitrate-mono-mp3"
+                                }
+                            }
+                        }
+                    };
+                    
+                    this.ws.send(`X-Timestamp:${timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n${JSON.stringify(config)}`);
+
+                    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%'>${text}</prosody></voice></speak>`;
+                    this.ws.send(`X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${timestamp}\r\nPath:ssml\r\n\r\n${ssml}`);
+                };
+
+                this.ws.onmessage = async (event) => {
+                    if (typeof event.data === 'string') {
+                        if (event.data.includes('Path:turn.end')) {
+                            this.ws.close();
+                            if (onEnd) setTimeout(onEnd, 1000); // Give time for audio to finish
+                        }
+                    } else if (event.data instanceof Blob) {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        const textHeaderEnd = this.findHeaderEnd(arrayBuffer);
+                        
+                        if (textHeaderEnd > 0) {
+                            const audioData = arrayBuffer.slice(textHeaderEnd);
+                            if (audioData.byteLength > 0) {
+                                try {
+                                    // Decode audio data
+                                    const audioBuffer = await this.audioContext.decodeAudioData(audioData);
+                                    this.playBuffer(audioBuffer);
+                                    if (!this.isPlaying) {
+                                        this.isPlaying = true;
+                                        if (onStart) onStart();
+                                    }
+                                } catch (e) {
+                                    console.warn("Decode error (partial frame?):", e);
+                                }
+                            }
+                        }
+                    }
+                };
+
+                this.ws.onerror = (e) => {
+                    if (onError) onError(e);
+                };
+            }
+
+            playBuffer(buffer) {
+                const source = this.audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.audioContext.destination);
+                
+                // Schedule playback
+                const start = Math.max(this.nextStartTime, this.audioContext.currentTime);
+                source.start(start);
+                this.nextStartTime = start + buffer.duration;
+            }
+
+            findHeaderEnd(arrayBuffer) {
+                const view = new Uint8Array(arrayBuffer);
+                for (let i = 0; i < view.length - 3; i++) {
+                    if (view[i] === 13 && view[i+1] === 10 && view[i+2] === 13 && view[i+3] === 10) {
+                        return i + 4;
+                    }
+                }
+                return 0;
+            }
+
+            generateRequestId() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            stop() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                this.isPlaying = false;
+            }
+        }
+
+        const ttsClient = new EdgeTTSClient();
+
+        async function playVoiceClientSide(shortName, btn) {
+            if (currentPlayingBtn === btn) {
+                ttsClient.stop();
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+                return;
+            }
+
+            if (currentPlayingBtn) {
+                // Stop other playing
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
+                ttsClient.stop();
+                currentPlayingBtn.textContent = '▶';
+                currentPlayingBtn.classList.remove('playing');
+            }
+
+            btn.textContent = '⏳';
+            btn.classList.add('playing');
+            currentPlayingBtn = btn;
+
+            try {
+                await ttsClient.play(
+                    "Hello! This is a direct client-side stream.",
+                    shortName,
+                    () => { // onStart
+                        btn.textContent = '⏹';
+                    },
+                    () => { // onEnd
+                        btn.textContent = '▶';
+                        btn.classList.remove('playing');
+                        currentPlayingBtn = null;
+                    },
+                    (err) => { // onError
+                        console.error("Client TTS error:", err);
+                        btn.textContent = '▶';
+                        btn.classList.remove('playing');
+                        currentPlayingBtn = null;
+                        alert("Client-side streaming failed. Try unchecking the box.");
+                    }
+                );
+            } catch (e) {
+                console.error(e);
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+            }
+        }
+
         // Play voice preview using streaming TTS API
         async function playVoice(shortName, btn) {
+            // Check if client-side streaming is enabled
+            const useClientSide = document.getElementById('useClientSideTTS') && document.getElementById('useClientSideTTS').checked;
+            
+            if (useClientSide) {
+                playVoiceClientSide(shortName, btn);
+                return;
+            }
+
             // Stop any currently playing audio
             if (currentAudio) {
                 currentAudio.pause();
@@ -1012,6 +1206,9 @@ Scene 3: Third narration here..."></textarea>
                     currentPlayingBtn.classList.remove('playing');
                 }
             }
+            
+            // Stop client TTS if playing
+            ttsClient.stop();
 
             if (currentPlayingBtn === btn) {
                 currentPlayingBtn = null;

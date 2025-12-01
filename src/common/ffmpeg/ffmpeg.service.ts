@@ -184,35 +184,35 @@ export class FfmpegService {
       }
     }
 
-    // Apply entrance animation (fade in) with smoother curve
+    // Apply entrance animation (fade in)
     if (animations.animationIn && animations.animationIn !== 'none') {
       if (
         animations.animationIn === 'fade' ||
         animations.animationIn.startsWith('slide-')
       ) {
-        // Use easing curve for smoother fade: sine easing
-        filterChain += `,fade=t=in:st=0:d=${transitionDuration}:curve=qsin`;
+        // Standard linear fade
+        filterChain += `,fade=t=in:st=0:d=${transitionDuration}`;
       } else if (animations.animationIn === 'zoom-in') {
-        filterChain += `,fade=t=in:st=0:d=${transitionDuration}:curve=qsin`;
+        filterChain += `,fade=t=in:st=0:d=${transitionDuration}`;
       } else if (animations.animationIn === 'zoom-out') {
-        filterChain += `,fade=t=in:st=0:d=${transitionDuration}:curve=qsin`;
+        filterChain += `,fade=t=in:st=0:d=${transitionDuration}`;
       }
     }
 
-    // Apply exit animation (fade out) with smoother curve
+    // Apply exit animation (fade out)
     if (animations.animationOut && animations.animationOut !== 'none') {
       const exitStart = Math.max(0, duration - transitionDuration);
       if (
         animations.animationOut === 'fade' ||
         animations.animationOut.startsWith('slide-')
       ) {
-        // Use easing curve for smoother fade: sine easing
-        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}:curve=qsin`;
+        // Standard linear fade
+        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}`;
       } else if (
         animations.animationOut === 'zoom-in' ||
         animations.animationOut === 'zoom-out'
       ) {
-        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}:curve=qsin`;
+        filterChain += `,fade=t=out:st=${exitStart}:d=${transitionDuration}`;
       }
     }
 
