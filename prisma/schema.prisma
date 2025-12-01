@@ -27,6 +27,7 @@ model StoryProject {
   storyMode        String?     // 'topic', 'prompt', or 'narrations'
   storyPrompt      String?     // User-provided story prompt
   allowedAnimations String?    // JSON array of allowed animation types
+  contentType      String?     // 'story' or 'educational' - affects image prompt generation
 
   titleGenerated       String?
   descriptionGenerated String?

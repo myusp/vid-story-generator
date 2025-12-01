@@ -37,6 +37,12 @@ export enum NarrativeTone {
   MYSTERIOUS = 'mysterious',
 }
 
+// Content type for video generation
+export enum ContentType {
+  STORY = 'story', // Story with characters and narrative
+  EDUCATIONAL = 'educational', // Educational/explainer content with illustrations
+}
+
 // Animation types for video effects
 export enum AnimationType {
   PAN_LEFT = 'pan-left',
@@ -187,4 +193,15 @@ export class StartStoryDto {
   @IsArray()
   @IsString({ each: true })
   allowedAnimations?: string[];
+
+  @ApiProperty({
+    description:
+      'Content type: story (with characters) or educational (illustrations/explanations)',
+    enum: ContentType,
+    example: ContentType.STORY,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ContentType)
+  contentType?: ContentType;
 }

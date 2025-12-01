@@ -133,6 +133,7 @@ export class StoryService {
         allowedAnimations: dto.allowedAnimations?.length
           ? JSON.stringify(dto.allowedAnimations)
           : null,
+        contentType: dto.contentType || 'story',
         status: StoryStatus.PENDING,
       },
     });
@@ -332,11 +333,14 @@ export class StoryService {
         }
       }
 
-      // Step 2.5: Generate character descriptions if not already done
+      // Step 2.5: Generate character descriptions if not already done (skip for educational content)
       // Use updated project data for topic if it was changed
+      const contentType = project.contentType || 'story';
       let characterDescriptions = updatedProject?.characterDescriptions;
       const topicForCharacters = updatedProject?.topic || project.topic;
-      if (!characterDescriptions) {
+
+      // Only generate character descriptions for story content, not educational
+      if (!characterDescriptions && contentType === 'story') {
         await this.logMessage(
           projectId,
           'INFO',
@@ -387,7 +391,8 @@ export class StoryService {
           })),
           project.imageStyle || '',
           provider,
-          characterDescriptions, // Pass character descriptions for consistency
+          characterDescriptions, // Pass character descriptions for consistency (null for educational)
+          contentType, // Pass content type for appropriate image prompt generation
         );
 
         // Update scenes with image prompts

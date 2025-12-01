@@ -375,6 +375,7 @@ The descriptions should be detailed enough to generate consistent images across 
     imageStyle: string,
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
+    contentType: string = 'story',
   ): Promise<ImagePromptData[]> {
     const results: ImagePromptData[] = [];
 
@@ -396,6 +397,7 @@ The descriptions should be detailed enough to generate consistent images across 
           provider,
           characterDescriptions,
           previousContext,
+          contentType,
         );
 
         // Create a map for O(1) lookups
@@ -420,6 +422,7 @@ The descriptions should be detailed enough to generate consistent images across 
               provider,
               characterDescriptions,
               prevScene,
+              contentType,
             );
             results.push({
               order: narration.order,
@@ -441,6 +444,7 @@ The descriptions should be detailed enough to generate consistent images across 
             provider,
             characterDescriptions,
             prevScene,
+            contentType,
           );
           results.push({
             order: narration.order,
@@ -459,6 +463,7 @@ The descriptions should be detailed enough to generate consistent images across 
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
     previousContext?: ImagePromptData[],
+    contentType: string = 'story',
   ): Promise<ImagePromptData[]> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
     const narrationsText = narrations
@@ -476,10 +481,10 @@ The descriptions should be detailed enough to generate consistent images across 
       previousSceneContext = `\n\nPREVIOUS SCENES (for continuity - maintain visual consistency):\n${previousContext.map((p) => `Scene ${p.order} image prompt: "${p.imagePrompt.substring(0, AiService.CONTEXT_PREVIEW_LENGTH)}..."`).join('\n')}\n`;
     }
 
-    const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
-${characterContext}${previousSceneContext}
-${narrationsText}
+    // Different prompts for story vs educational content
+    const isEducational = contentType === 'educational';
 
+    const storyPromptRules = `
 For EACH scene listed above, create a prompt that includes:
 - Main subject/characters (use the character descriptions above for consistency if they appear in the scene)
 - Setting/environment (maintain consistency with previous scenes if continuing the same location)
@@ -494,7 +499,31 @@ IMPORTANT RULES FOR VISUAL CONTINUITY:
 4. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration (side view, 3/4 view, etc.)
 5. Characters should be DOING something related to the narration, not just standing/posing.
 6. Maintain visual continuity with the previous scenes - if a scene continues in the same location, keep the setting consistent.
-7. Match the camera angle and perspective to the story action (e.g., if someone is walking, show them from the side; if they're looking at something, show what they see).
+7. Match the camera angle and perspective to the story action (e.g., if someone is walking, show them from the side; if they're looking at something, show what they see).`;
+
+    const educationalPromptRules = `
+For EACH scene listed above, create a prompt for an EDUCATIONAL/EXPLAINER illustration that includes:
+- Main concept or subject being explained (diagrams, infographics, conceptual illustrations)
+- Visual metaphors or representations of abstract concepts
+- Clean, clear composition focused on the educational message
+- Supporting visual elements (icons, symbols, text labels if needed)
+- Appropriate background that doesn't distract from the main concept
+
+IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
+1. You MUST return a result for EACH scene with the EXACT order number specified above.
+2. DO NOT include human characters or people - focus on concepts, objects, diagrams, and illustrations.
+3. Use visual metaphors and symbolic representations to explain concepts.
+4. Keep the visual style clean and professional, suitable for educational content.
+5. Include relevant icons, symbols, or simplified diagrams that help explain the concept.
+6. Maintain visual consistency across scenes (same color scheme, style, visual language).
+7. The illustration should be self-explanatory and support the narration text.
+8. Think like an infographic designer - clarity and understanding are the priority.`;
+
+    const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
+${characterContext}${previousSceneContext}
+${narrationsText}
+
+${isEducational ? educationalPromptRules : storyPromptRules}
 
 Return ONLY a JSON array in this exact format (one entry for EACH scene):
 [
@@ -524,6 +553,7 @@ Generate exactly ${narrations.length} results, one for each scene.`;
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
     previousScene?: ImagePromptData | null,
+    contentType: string = 'story',
   ): Promise<string> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
     const characterContext = characterDescriptions
@@ -535,10 +565,9 @@ Generate exactly ${narrations.length} results, one for each scene.`;
       previousContext = `\n\nPREVIOUS SCENE (for continuity):\nScene ${previousScene.order} image prompt: "${previousScene.imagePrompt}"\n`;
     }
 
-    const prompt = `Based on this narration: "${narration}"
-${characterContext}${previousContext}
-Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
+    const isEducational = contentType === 'educational';
 
+    const storyPromptContent = `
 The prompt should be in English and describe:
 - Main subject/characters (use the character descriptions above if they appear in this scene)
 - Setting/environment (maintain consistency with previous scene if continuing the same location)
@@ -550,7 +579,27 @@ IMPORTANT RULES:
 1. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration.
 2. Characters should be DOING something related to the narration, not just standing/posing.
 3. Maintain visual continuity with the previous scene if applicable.
-4. Match the camera angle to the story action.
+4. Match the camera angle to the story action.`;
+
+    const educationalPromptContent = `
+The prompt should be in English and describe an EDUCATIONAL ILLUSTRATION:
+- Main concept or subject being explained (diagrams, infographics, conceptual illustrations)
+- Visual metaphors or representations of abstract concepts
+- Clean, clear composition focused on the educational message
+- Supporting visual elements (icons, symbols, text labels if needed)
+
+IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
+1. DO NOT include human characters or people - focus on concepts, objects, diagrams, and illustrations.
+2. Use visual metaphors and symbolic representations to explain concepts.
+3. Keep the visual style clean and professional, suitable for educational content.
+4. Include relevant icons, symbols, or simplified diagrams that help explain the concept.
+5. The illustration should be self-explanatory and support the narration text.`;
+
+    const prompt = `Based on this narration: "${narration}"
+${characterContext}${previousContext}
+Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
+
+${isEducational ? educationalPromptContent : storyPromptContent}
 
 Return ONLY the image prompt as plain text, no JSON.`;
 
@@ -579,10 +628,14 @@ Return ONLY the image prompt as plain text, no JSON.`;
   /**
    * Step 3: Generate prosody segments based on punctuation
    * Replaces AI-based splitting to ensure logical pauses at punctuation marks
+   * Note: narrativeTone and provider params kept for interface compatibility
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async generateProsodyBatch(
     narrations: Array<{ order: number; narration: string }>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     narrativeTone: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     provider: 'gemini' | 'openai',
   ): Promise<ProsodyData[]> {
     const results: ProsodyData[] = [];

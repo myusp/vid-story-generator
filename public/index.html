@@ -682,16 +682,26 @@ Scene 3: Third narration here..."></textarea>
 
                     <div class="form-group">
                         <label for="totalImages">Total Scenes *</label>
-                        <input type="number" id="totalImages" required value="8" min="3" max="20">
+                        <input type="number" id="totalImages" required value="8" min="1">
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="modelProvider">AI Model *</label>
-                    <select id="modelProvider" required>
-                        <option value="gemini">Gemini</option>
-                        <option value="openai">OpenAI</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="modelProvider">AI Model *</label>
+                        <select id="modelProvider" required>
+                            <option value="gemini">Gemini</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contentType">Content Type</label>
+                        <select id="contentType">
+                            <option value="story">Story (with characters)</option>
+                            <option value="educational">Educational (illustrations/explainer)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1304,6 +1314,7 @@ Scene 3: Third narration here..."></textarea>
                 modelProvider: document.getElementById('modelProvider').value,
                 imageStyle: document.getElementById("imageStyle").value || null,
                 narrativeTone: document.getElementById("narrativeTone").value || null,
+                contentType: document.getElementById("contentType").value || 'story',
             };
 
             // Handle different story modes
@@ -1328,8 +1339,8 @@ Scene 3: Third narration here..."></textarea>
             } else if (storyMode === 'narrations') {
                 const narrationsText = document.getElementById('existingNarrations').value;
                 const narrations = narrationsText.split('\n').filter(line => line.trim());
-                if (narrations.length < 2) {
-                    showMessage('Please enter at least 2 narrations (one per line)', 'error');
+                if (narrations.length < 1) {
+                    showMessage('Please enter at least 1 narration', 'error');
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Create Story';
                     return;
