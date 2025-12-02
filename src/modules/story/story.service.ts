@@ -142,12 +142,40 @@ export class StoryService {
 
     // If using existing narrations, create scenes immediately
     if (storyMode === 'narrations' && dto.existingNarrations?.length) {
-      for (let i = 0; i < dto.existingNarrations.length; i++) {
+      let narrations = dto.existingNarrations;
+
+      // If target duration is set, split the text using AI
+      if (dto.targetSceneDuration && dto.targetSceneDuration > 0) {
+        const fullText = dto.existingNarrations.join(' ');
+        await this.logMessage(
+          project.id,
+          'INFO',
+          'SPLITTING_TEXT',
+          `Splitting text into scenes of ~${dto.targetSceneDuration}s duration...`,
+        );
+
+        const splitScenes = await this.aiService.splitTextByDuration(
+          fullText,
+          dto.targetSceneDuration,
+          dto.language,
+          dto.modelProvider,
+        );
+        narrations = splitScenes.map((s) => s.narration);
+        totalImages = narrations.length;
+
+        // Update project totalImages
+        await this.prisma.storyProject.update({
+          where: { id: project.id },
+          data: { totalImages },
+        });
+      }
+
+      for (let i = 0; i < narrations.length; i++) {
         await this.prisma.storyScene.create({
           data: {
             projectId: project.id,
             order: i + 1,
-            narration: dto.existingNarrations[i],
+            narration: narrations[i],
           },
         });
       }
@@ -490,8 +518,8 @@ export class StoryService {
         fs.mkdirSync(projectAudioDir, { recursive: true });
       }
 
-      const width = project.orientation === 'PORTRAIT' ? 2160 : 3840;
-      const height = project.orientation === 'PORTRAIT' ? 3840 : 2160;
+      const width = project.orientation === 'PORTRAIT' ? 1080 : 1920;
+      const height = project.orientation === 'PORTRAIT' ? 1920 : 1080;
 
       // Get concurrency from env, default to 4
       const concurrencyValue = parseInt(
@@ -751,6 +779,8 @@ export class StoryService {
             animationShow: scene.animationShow,
             animationOut: scene.animationOut,
           },
+          width,
+          height,
         );
         sceneVideos.push(sceneVideoPath);
       }

@@ -198,6 +198,43 @@ Create exactly ${targetSceneCount} scenes.`;
   }
 
   /**
+   * Split text into scenes based on target duration per scene
+   */
+  async splitTextByDuration(
+    text: string,
+    targetDurationSec: number,
+    language: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<NarrationOnly[]> {
+    const prompt = `You are a video editor. Split the following text into scenes where each scene takes approximately ${targetDurationSec} seconds to speak.
+
+Text: "${text}"
+Language: ${language}
+
+Rules:
+1. Each scene should be a coherent segment.
+2. Aim for ${targetDurationSec} seconds per scene (roughly ${Math.round(targetDurationSec * 2.5)} words).
+3. Do not change the text content, just split it.
+4. Return a JSON array of objects with "order" and "narration".
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "narration": "first scene narration"
+  }
+]`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const scenes = JSON.parse(this.extractJSON(response));
+
+    return scenes.map((item: any, index: number) => ({
+      order: item.order || index + 1,
+      narration: item.narration,
+    }));
+  }
+
+  /**
    * Generate metadata from existing narrations (for narrations mode)
    * AI analyzes the narrations and generates title, description, etc.
    */
@@ -498,14 +535,19 @@ For EACH scene listed above, create a prompt that includes:
 - Visual details
 - Composition (consider the flow from previous scenes)
 
-IMPORTANT RULES FOR VISUAL CONTINUITY:
+IMPORTANT RULES FOR VISUAL VARIETY AND CONTINUITY:
 1. You MUST return a result for EACH scene with the EXACT order number specified above.
 2. If a character from the character descriptions appears in the scene, use their exact visual description.
 3. Keep character appearances consistent across all scenes.
-4. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration (side view, 3/4 view, etc.)
-5. Characters should be DOING something related to the narration, not just standing/posing.
-6. Maintain visual continuity with the previous scenes - if a scene continues in the same location, keep the setting consistent.
-7. Match the camera angle and perspective to the story action (e.g., if someone is walking, show them from the side; if they're looking at something, show what they see).`;
+4. **CRITICAL: AVOID PORTRAIT-STYLE IMAGES.** Do NOT always focus on the character's face.
+5. **VARY THE FOCUS:**
+   - Some scenes should focus on the **ENVIRONMENT/SETTING** (wide shot) to establish context.
+   - Some scenes should focus on the **ACTION/EVENT** (medium or full body shot).
+   - Some scenes should focus on **OBJECTS** or **DETAILS** mentioned in the narration (close-up).
+   - Only use close-up of faces when the narration emphasizes emotion.
+6. **USE DIVERSE CAMERA ANGLES:** Wide shots, over-the-shoulder shots, low angles, high angles, point-of-view shots.
+7. Characters should be DOING something related to the narration, not just standing/posing.
+8. Maintain visual continuity with the previous scenes - if a scene continues in the same location, keep the setting consistent.`;
 
     const educationalPromptRules = `
 For EACH scene listed above, create a UNIQUE and VARIED prompt for an EDUCATIONAL/EXPLAINER illustration.
@@ -591,12 +633,13 @@ The prompt should be in English and describe:
 - Visual details
 - Composition
 
-IMPORTANT RULES:
-1. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration.
-2. Characters should be DOING something related to the narration, not just standing/posing.
-3. Maintain visual continuity with the previous scene if applicable.
-4. Match the camera angle to the story action.
-5. DO NOT include any text, labels, words, letters, or numbers in the image.`;
+IMPORTANT RULES FOR VARIETY:
+1. **AVOID PORTRAIT-STYLE IMAGES.** Do NOT focus solely on the character's face unless necessary for emotion.
+2. **VARY THE FOCUS:** Focus on the **EVENT**, **ACTIVITY**, or **SETTING** described in the narration.
+3. **USE DYNAMIC ANGLES:** Use wide shots, over-the-shoulder, or point-of-view shots to show the scene context.
+4. Characters should be DOING something related to the narration, not just standing/posing.
+5. Maintain visual continuity with the previous scene if applicable.
+6. DO NOT include any text, labels, words, letters, or numbers in the image.`;
 
     const educationalPromptContent = `
 The prompt should be in English and describe a UNIQUE EDUCATIONAL ILLUSTRATION:
