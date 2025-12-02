@@ -54,6 +54,7 @@ export function splitByPunctuation(text: string): string[] {
 
 /**
  * Determine prosody settings based on punctuation and text content
+ * Using subtle variations to maintain smooth, natural speech flow
  */
 export function getProsodyFromPunctuation(text: string): {
   rate: string;
@@ -62,34 +63,34 @@ export function getProsodyFromPunctuation(text: string): {
 } {
   const trimmedText = text.trim();
 
-  // Check for multiple exclamation marks (very excited)
+  // Check for multiple exclamation marks (very excited) - reduced variation
   if (/!{2,}$/.test(trimmedText) || /!\?|\?!/.test(trimmedText)) {
-    return { rate: '+15%', volume: '+40%', pitch: '+15Hz' };
+    return { rate: '+5%', volume: '+15%', pitch: '+5Hz' };
   }
 
-  // Check for exclamation (excited/emphasis)
+  // Check for exclamation (excited/emphasis) - reduced variation
   if (trimmedText.endsWith('!')) {
-    return { rate: '+10%', volume: '+30%', pitch: '+10Hz' };
+    return { rate: '+3%', volume: '+10%', pitch: '+3Hz' };
   }
 
-  // Check for question marks
+  // Check for question marks - reduced variation
   if (trimmedText.endsWith('?')) {
-    return { rate: '+5%', volume: '+10%', pitch: '+15Hz' };
+    return { rate: '+2%', volume: '+5%', pitch: '+5Hz' };
   }
 
-  // Check for ellipsis (suspense/slow)
+  // Check for ellipsis (suspense/slow) - reduced variation
   if (/\.{2,}$/.test(trimmedText) || trimmedText.endsWith('…')) {
-    return { rate: '-15%', volume: '-10%', pitch: '-5Hz' };
+    return { rate: '-5%', volume: '-3%', pitch: '-2Hz' };
   }
 
-  // Check for colon (introducing something)
+  // Check for colon (introducing something) - minimal variation
   if (trimmedText.endsWith(':')) {
-    return { rate: '-5%', volume: '+5%', pitch: '+0Hz' };
+    return { rate: '-2%', volume: '+2%', pitch: '+0Hz' };
   }
 
-  // Check for semicolon (pause/continuation)
+  // Check for semicolon (pause/continuation) - minimal variation
   if (trimmedText.endsWith(';')) {
-    return { rate: '-5%', volume: '+0%', pitch: '+0Hz' };
+    return { rate: '-2%', volume: '+0%', pitch: '+0Hz' };
   }
 
   // Default for periods and other punctuation

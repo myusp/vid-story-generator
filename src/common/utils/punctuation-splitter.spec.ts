@@ -52,28 +52,30 @@ describe('punctuation-splitter', () => {
   describe('getProsodyFromPunctuation', () => {
     it('should return excited prosody for exclamation marks', () => {
       const result = getProsodyFromPunctuation('Wow!');
-      expect(result.rate).toBe('+10%');
-      expect(result.volume).toBe('+30%');
-      expect(result.pitch).toBe('+10Hz');
+      expect(result.rate).toBe('+3%');
+      expect(result.volume).toBe('+10%');
+      expect(result.pitch).toBe('+3Hz');
     });
 
     it('should return very excited prosody for multiple exclamation marks', () => {
       const result = getProsodyFromPunctuation('Amazing!!');
-      expect(result.rate).toBe('+15%');
-      expect(result.volume).toBe('+40%');
-      expect(result.pitch).toBe('+15Hz');
+      expect(result.rate).toBe('+5%');
+      expect(result.volume).toBe('+15%');
+      expect(result.pitch).toBe('+5Hz');
     });
 
     it('should return question prosody for question marks', () => {
       const result = getProsodyFromPunctuation('Really?');
-      expect(result.rate).toBe('+5%');
-      expect(result.pitch).toBe('+15Hz');
+      expect(result.rate).toBe('+2%');
+      expect(result.volume).toBe('+5%');
+      expect(result.pitch).toBe('+5Hz');
     });
 
     it('should return slow prosody for ellipsis', () => {
       const result = getProsodyFromPunctuation('Wait...');
-      expect(result.rate).toBe('-15%');
-      expect(result.volume).toBe('-10%');
+      expect(result.rate).toBe('-5%');
+      expect(result.volume).toBe('-3%');
+      expect(result.pitch).toBe('-2Hz');
     });
 
     it('should return default prosody for periods', () => {
@@ -91,9 +93,9 @@ describe('punctuation-splitter', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Hello!');
-      expect(result[0].rate).toBe('+10%');
+      expect(result[0].rate).toBe('+3%');
       expect(result[1].text).toBe('How are you?');
-      expect(result[1].rate).toBe('+5%');
+      expect(result[1].rate).toBe('+2%');
     });
 
     it('should handle single sentence', () => {

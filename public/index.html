@@ -1388,21 +1388,22 @@ Scene 3: Third narration here..."></textarea>
                 
                 const project = await response.json();
                 
-                // Trigger generation
-                await fetch(`${API_URL}/stories/${project.id}/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'X-API-KEY': API_KEY
-                    }
-                });
-
-                showMessage('Story project created! Generation started.', 'success');
+                // Generation is now triggered automatically by the /start endpoint
+                // No need for separate /generate call
+                
+                showMessage('Story project created! Generation started automatically.', 'success');
                 document.getElementById('storyForm').reset();
                 document.getElementById('selectedSpeaker').value = '';
                 updateStoryModeUI(); // Reset UI
                 
-                // Switch to projects tab
+                // Switch to projects tab and subscribe to SSE
                 switchTab('projects');
+                loadProjects();
+                
+                // Subscribe to SSE for real-time updates
+                if (project.id) {
+                    subscribeToProjectLogs(project.id);
+                }
             } catch (error) {
                 showMessage('Failed to create story: ' + error.message, 'error');
             } finally {

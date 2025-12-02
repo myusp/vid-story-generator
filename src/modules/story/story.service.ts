@@ -555,9 +555,22 @@ export class StoryService {
             `Generating ${scenesNeedingImages.length} images...`,
           );
 
+          // Add delay between image requests to avoid rate limiting
+          const imageDelayMs = parseInt(
+            this.configService.get<string>('IMAGE_REQUEST_DELAY_MS', '1000'),
+            10,
+          );
+          const delay =
+            !isNaN(imageDelayMs) && imageDelayMs >= 0 ? imageDelayMs : 1000;
+
           return pMap(
             scenesNeedingImages,
-            async (scene) => {
+            async (scene, index) => {
+              // Add delay between requests (except for the first one)
+              if (index > 0 && delay > 0) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+              }
+
               const imagePath = path.join(
                 projectImageDir,
                 `scene_${scene.order}.jpg`,

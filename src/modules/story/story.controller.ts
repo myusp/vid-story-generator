@@ -30,13 +30,23 @@ export class StoryController {
   constructor(private readonly storyService: StoryService) {}
 
   @Post('start')
-  @ApiOperation({ summary: 'Start a new story project' })
+  @ApiOperation({ summary: 'Start a new story project and begin generation' })
   @ApiResponse({
     status: 201,
-    description: 'Project created successfully',
+    description: 'Project created and generation started',
   })
   async startProject(@Body() dto: StartStoryDto) {
-    return this.storyService.startProject(dto);
+    const project = await this.storyService.startProject(dto);
+
+    // Automatically trigger generation in background
+    this.storyService.generateFullStory(project.id).catch((error) => {
+      console.error('Generation failed:', error);
+    });
+
+    return {
+      ...project,
+      message: 'Project created and generation started in background',
+    };
   }
 
   @Post(':id/generate')
