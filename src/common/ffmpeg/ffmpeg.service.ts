@@ -241,52 +241,52 @@ export class FfmpegService {
     const fps = this.VIDEO_FPS;
     const frames = Math.floor(duration * fps);
 
-    // Use smaller zoom ranges for smoother, less shaky animations
-    // Reduced from 0.04-0.1 to 0.02-0.05 for subtler, smoother movements
-    const zoomSlowIncrement = 0.02 / frames; // 1.0 → 1.02 (was 1.04)
-    const zoomInIncrement = 0.04 / frames; // 1.0 → 1.04 (was 1.08)
-    const zoomOutDecrement = 0.05 / frames; // 1.05 → 1.0 (was 1.1 → 1.0)
+    // Increase zoom ranges for more dynamic, noticeable movements
+    // Pan uses 1.1x zoom for more dramatic effect
+    // Regular zoom animations use larger ranges for better visual impact
+    const zoomSlowIncrement = 0.06 / frames; // 1.0 → 1.06 (increased from 1.02)
+    const zoomInIncrement = 0.12 / frames; // 1.0 → 1.12 (increased from 1.04)
+    const zoomOutDecrement = 0.15 / frames; // 1.15 → 1.0 (increased from 1.05)
 
-    // Pan increment per frame - use consistent small zoom for panning
-    // Smaller zoom (1.03) reduces shaking while still allowing pan movement
+    // Pan increment per frame - use larger zoom (1.1) for more visible movement
     const panIncrement = 1.0 / frames;
 
     switch (animation) {
       case 'pan-left': {
-        // Pan from right to left with constant 1.03x zoom (reduced from 1.05)
+        // Pan from right to left with 1.1x zoom for more dramatic movement
         // x starts at max (right), decrements to 0 (left)
-        return `zoompan=z=1.03:x='(iw-iw/zoom)*(1-${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
+        return `zoompan=z=1.1:x='(iw-iw/zoom)*(1-${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'pan-right': {
-        // Pan from left to right
+        // Pan from left to right with 1.1x zoom
         // x starts at 0 (left), increments to max (right)
-        return `zoompan=z=1.03:x='(iw-iw/zoom)*(${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
+        return `zoompan=z=1.1:x='(iw-iw/zoom)*(${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'pan-up': {
-        // Pan from bottom to top, centered horizontally
-        return `zoompan=z=1.03:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-${panIncrement}*on)':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Pan from bottom to top, centered horizontally with 1.1x zoom
+        return `zoompan=z=1.1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-${panIncrement}*on)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'pan-down': {
-        // Pan from top to bottom
-        return `zoompan=z=1.03:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(${panIncrement}*on)':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Pan from top to bottom with 1.1x zoom
+        return `zoompan=z=1.1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(${panIncrement}*on)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'zoom-slow': {
-        // Smooth zoom 1.0 → 1.02 using min() to clamp at final zoom
-        return `zoompan=z='min(zoom+${zoomSlowIncrement},1.02)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth zoom 1.0 → 1.06 using min() to clamp at final zoom
+        return `zoompan=z='min(zoom+${zoomSlowIncrement},1.06)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'zoom-in': {
-        // Smooth zoom 1.0 → 1.04 using min() to clamp
-        return `zoompan=z='min(zoom+${zoomInIncrement},1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth zoom 1.0 → 1.12 using min() to clamp
+        return `zoompan=z='min(zoom+${zoomInIncrement},1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'zoom-out': {
-        // Smooth zoom out 1.05 → 1.0 using max() to clamp at 1.0
-        return `zoompan=z='max(1.05-${zoomOutDecrement}*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
+        // Smooth zoom out 1.15 → 1.0 using max() to clamp at 1.0
+        return `zoompan=z='max(1.15-${zoomOutDecrement}*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=${fps}`;
       }
 
       case 'static':

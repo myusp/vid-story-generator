@@ -150,7 +150,12 @@ Return ONLY a JSON object in this exact format:
     targetSceneCount: number,
     language: string,
     provider: 'gemini' | 'openai',
+    targetSceneDuration?: number,
   ): Promise<NarrationOnly[]> {
+    const durationHint = targetSceneDuration
+      ? ` (approximately ${targetSceneDuration} seconds when spoken)`
+      : ' (5-15 seconds when spoken)';
+
     const prompt = `You are given a story text. Your task is to split it into ${targetSceneCount} logical scenes for a short video.
 
 Story Text:
@@ -162,11 +167,12 @@ Rules:
 1. Split the text into exactly ${targetSceneCount} scenes
 2. Each scene should be a natural paragraph that flows when spoken
 3. Maintain the original story's flow and meaning
-4. Each scene narration should be suitable for a single video scene (5-15 seconds when spoken)
+4. Each scene narration should be suitable for a single video scene${durationHint}
 5. Keep the narrations in the same language as the original text (${language})
 6. Use VERY SIMPLE language suitable for a 10-year-old child
 7. Avoid poetic, flowery, or hyperbolic expressions
 8. Use short, direct sentences with common words
+9. Aim for narrations that take about ${targetSceneDuration || '8-10'} seconds to speak aloud
 
 Return ONLY a JSON array in this exact format:
 [

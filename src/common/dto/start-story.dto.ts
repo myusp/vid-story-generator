@@ -4,6 +4,7 @@ import {
   IsInt,
   IsEnum,
   Min,
+  Max,
   IsOptional,
   IsArray,
 } from 'class-validator';
@@ -179,6 +180,20 @@ export class StartStoryDto {
   @IsArray()
   @IsString({ each: true })
   existingNarrations?: string[];
+
+  @ApiProperty({
+    description:
+      'Target duration per scene in seconds (for narrations mode - helps AI split scenes appropriately)',
+    example: 8,
+    minimum: 3,
+    maximum: 20,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(3)
+  @Max(20)
+  targetSceneDuration?: number;
 
   @ApiProperty({
     description:

@@ -624,6 +624,13 @@ Scene 3: Third narration here..."></textarea>
                     <small style="color: #666;">Enter one narration per line. Each line becomes a scene.</small>
                 </div>
 
+                <!-- Target Scene Duration (for narrations mode) -->
+                <div class="form-group hidden" id="sceneDurationGroup">
+                    <label for="targetSceneDuration">Target Duration per Scene (seconds)</label>
+                    <input type="number" id="targetSceneDuration" min="3" max="20" value="8" placeholder="8">
+                    <small style="color: #666;">Recommended: 6-10 seconds. Helps AI split scenes appropriately.</small>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="genre">Genre *</label>
@@ -1346,6 +1353,12 @@ Scene 3: Third narration here..."></textarea>
                     return;
                 }
                 data.existingNarrations = narrations;
+                
+                // Add target scene duration if specified
+                const sceneDuration = parseInt(document.getElementById('targetSceneDuration').value);
+                if (sceneDuration && sceneDuration >= 3 && sceneDuration <= 20) {
+                    data.targetSceneDuration = sceneDuration;
+                }
             }
 
             // Get allowed animations if any are selected
@@ -1706,12 +1719,14 @@ Scene 3: Third narration here..."></textarea>
             const topicGroup = document.getElementById('topicGroup');
             const storyPromptGroup = document.getElementById('storyPromptGroup');
             const narrationsGroup = document.getElementById('narrationsGroup');
+            const sceneDurationGroup = document.getElementById('sceneDurationGroup');
             const totalImagesGroup = document.getElementById('totalImages').parentElement;
 
             // Hide all
             topicGroup.classList.add('hidden');
             storyPromptGroup.classList.add('hidden');
             narrationsGroup.classList.add('hidden');
+            sceneDurationGroup.classList.add('hidden');
 
             // Show based on mode
             if (mode === 'topic') {
@@ -1722,6 +1737,7 @@ Scene 3: Third narration here..."></textarea>
                 totalImagesGroup.style.display = 'block';
             } else if (mode === 'narrations') {
                 narrationsGroup.classList.remove('hidden');
+                sceneDurationGroup.classList.remove('hidden');
                 totalImagesGroup.style.display = 'none'; // Auto-calculated from narrations
             }
         }
