@@ -556,12 +556,18 @@ export class StoryService {
           );
 
           // Add delay between image requests to avoid rate limiting
+          const DEFAULT_IMAGE_DELAY_MS = 1000;
           const imageDelayMs = parseInt(
-            this.configService.get<string>('IMAGE_REQUEST_DELAY_MS', '1000'),
+            this.configService.get<string>(
+              'IMAGE_REQUEST_DELAY_MS',
+              String(DEFAULT_IMAGE_DELAY_MS),
+            ),
             10,
           );
           const delay =
-            !isNaN(imageDelayMs) && imageDelayMs >= 0 ? imageDelayMs : 1000;
+            !isNaN(imageDelayMs) && imageDelayMs >= 0
+              ? imageDelayMs
+              : DEFAULT_IMAGE_DELAY_MS;
 
           return pMap(
             scenesNeedingImages,

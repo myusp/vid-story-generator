@@ -9,6 +9,7 @@ import {
   NotFoundException,
   Res,
   StreamableFile,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,6 +28,8 @@ import * as path from 'path';
 @ApiSecurity('api-key')
 @Controller('stories')
 export class StoryController {
+  private readonly logger = new Logger(StoryController.name);
+
   constructor(private readonly storyService: StoryService) {}
 
   @Post('start')
@@ -40,7 +43,7 @@ export class StoryController {
 
     // Automatically trigger generation in background
     this.storyService.generateFullStory(project.id).catch((error) => {
-      console.error('Generation failed:', error);
+      this.logger.error(`Generation failed for project ${project.id}:`, error);
     });
 
     return {
@@ -62,9 +65,9 @@ export class StoryController {
       throw new NotFoundException('Project not found');
     }
 
-    // Run generation in background (should use queue in production)
+    // Run generation in background
     this.storyService.generateFullStory(id).catch((error) => {
-      console.error('Generation failed:', error);
+      this.logger.error(`Generation failed for project ${id}:`, error);
     });
 
     return { message: 'Generation started', id };
@@ -85,7 +88,7 @@ export class StoryController {
 
     // Run generation in background with resume capability
     this.storyService.generateFullStory(id).catch((error) => {
-      console.error('Retry generation failed:', error);
+      this.logger.error(`Retry generation failed for project ${id}:`, error);
     });
 
     return { message: 'Retry started', id, currentStatus: project.status };
