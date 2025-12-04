@@ -38,6 +38,11 @@ export class GeminiTtsService {
   private readonly logger = new Logger(GeminiTtsService.name);
   private readonly geminiTtsModel: string;
 
+  // Audio format constants
+  private static readonly DEFAULT_SAMPLE_RATE = 44100;
+  private static readonly DEFAULT_BITS_PER_SAMPLE = 16;
+  private static readonly DEFAULT_CHANNELS = 2;
+
   // List of Gemini TTS voices based on documentation
   private readonly geminiVoices: GeminiVoice[] = [
     { name: 'Achernar', gender: 'Female' },
@@ -158,12 +163,15 @@ export class GeminiTtsService {
           const fileExtension = mime.getExtension(inlineData.mimeType || '');
           let buffer: Buffer;
 
+          // When MIME type doesn't have a recognized extension (e.g., raw PCM),
+          // we need to add WAV headers to make it playable
           if (!fileExtension) {
             buffer = this.convertToWav(
               inlineData.data || '',
               inlineData.mimeType || '',
             );
           } else {
+            // For recognized formats (mp3, wav, etc.), use the data as-is
             buffer = Buffer.from(inlineData.data || '', 'base64');
           }
 
@@ -307,8 +315,12 @@ export class GeminiTtsService {
     // Fallback: estimate from file size
     try {
       const stats = await fs.stat(audioPath);
-      // Rough estimation for WAV: assume 16-bit stereo at 44.1kHz
-      const durationSeconds = (stats.size * 8) / (44100 * 16 * 2);
+      // Rough estimation for audio file duration
+      const durationSeconds =
+        (stats.size * 8) /
+        (GeminiTtsService.DEFAULT_SAMPLE_RATE *
+          GeminiTtsService.DEFAULT_BITS_PER_SAMPLE *
+          GeminiTtsService.DEFAULT_CHANNELS);
       return Math.round(durationSeconds * 1000);
     } catch (error) {
       this.logger.warn(`Failed to estimate duration: ${error.message}`);
