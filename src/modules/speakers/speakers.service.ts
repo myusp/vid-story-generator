@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { EdgeTTS } from 'edge-tts-universal';
 import { TtsService } from '../../common/tts/tts.service';
 import { GeminiTtsService } from '../../common/tts/gemini-tts.service';
+import { PollinationsTtsService } from '../../common/tts/pollinations-tts.service';
 
 @Injectable()
 export class SpeakersService {
@@ -11,6 +12,7 @@ export class SpeakersService {
   constructor(
     private ttsService: TtsService,
     private geminiTtsService: GeminiTtsService,
+    private pollinationsTtsService: PollinationsTtsService,
   ) {}
 
   async listAvailableSpeakers() {
@@ -48,6 +50,30 @@ export class SpeakersService {
       }));
     } catch (error) {
       this.logger.error(`Failed to list Gemini TTS voices: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * List Pollinations TTS speakers
+   */
+  async listPollinationsSpeakers() {
+    try {
+      const voices = this.pollinationsTtsService.listVoices();
+
+      return voices.map((voice) => ({
+        name: voice.name,
+        shortName: voice.name,
+        displayName: `${voice.name.charAt(0).toUpperCase() + voice.name.slice(1)} - ${voice.description}`,
+        locale: 'multi', // Pollinations TTS voices are multilingual
+        gender: 'Neutral', // Pollinations doesn't specify gender
+        provider: 'pollinations-tts',
+        description: voice.description,
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Failed to list Pollinations TTS voices: ${error.message}`,
+      );
       return [];
     }
   }

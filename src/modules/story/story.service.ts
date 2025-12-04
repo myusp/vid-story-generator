@@ -646,7 +646,8 @@ export class StoryService {
 
                     const ttsProvider = (project.ttsProvider || 'edge-tts') as
                       | 'edge-tts'
-                      | 'gemini-tts';
+                      | 'gemini-tts'
+                      | 'pollinations-tts';
 
                     if (scene.prosodyData) {
                       try {

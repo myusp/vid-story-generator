@@ -695,18 +695,19 @@ Scene 3: Third narration here..."></textarea>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="modelProvider">AI Model *</label>
-                        <select id="modelProvider" required>
-                            <option value="gemini">Gemini</option>
-                            <option value="openai">OpenAI</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
                         <label for="contentType">Content Type</label>
                         <select id="contentType">
                             <option value="story">Story (with characters)</option>
                             <option value="educational">Educational (illustrations/explainer)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ttsProvider">TTS Provider *</label>
+                        <select id="ttsProvider" required onchange="switchTtsProvider()">
+                            <option value="edge-tts">Edge TTS (Free)</option>
+                            <option value="gemini-tts">Gemini TTS (Premium)</option>
+                            <option value="pollinations-tts">Pollinations TTS (Free)</option>
                         </select>
                     </div>
                 </div>
@@ -714,6 +715,7 @@ Scene 3: Third narration here..."></textarea>
                 <div class="form-group">
                     <label>Speaker Voice *</label>
                     <input type="text" id="selectedSpeaker" readonly placeholder="Select a speaker from the list below">
+                    <input type="hidden" id="selectedTtsProvider" value="edge-tts">
                     
                     <div class="speaker-container" id="speakerContainer">
                         <div class="speaker-search">
@@ -728,16 +730,19 @@ Scene 3: Third narration here..."></textarea>
                                 <option value="">All Genders</option>
                                 <option value="Female">Female</option>
                                 <option value="Male">Male</option>
+                                <option value="Neutral">Neutral</option>
                             </select>
                             <button type="button" onclick="loadSpeakers()" style="padding: 8px;">🔄 Refresh</button>
                         </div>
 
                         <div class="speaker-tabs">
-                            <button type="button" class="speaker-tab active" onclick="switchSpeakerTab('all')">All Voices</button>
-                            <button type="button" class="speaker-tab" onclick="switchSpeakerTab('favorites')">⭐ Favorites</button>
+                            <button type="button" class="speaker-tab active" data-provider="edge-tts" onclick="switchProviderTab('edge-tts')">Edge TTS</button>
+                            <button type="button" class="speaker-tab" data-provider="gemini-tts" onclick="switchProviderTab('gemini-tts')">Gemini TTS</button>
+                            <button type="button" class="speaker-tab" data-provider="pollinations-tts" onclick="switchProviderTab('pollinations-tts')">Pollinations</button>
+                            <button type="button" class="speaker-tab" data-provider="favorites" onclick="switchProviderTab('favorites')">⭐ Favorites</button>
                         </div>
 
-                        <div style="padding: 10px; background: #e3f2fd; border-bottom: 1px solid #e0e0e0;">
+                        <div id="edgeTtsOptions" style="padding: 10px; background: #e3f2fd; border-bottom: 1px solid #e0e0e0;">
                             <label class="checkbox-label" title="Connects directly to Microsoft Edge TTS servers from your browser">
                                 <input type="checkbox" id="useClientSideTTS"> 
                                 Use Client-Side Direct Streaming (Experimental)
@@ -827,7 +832,8 @@ Scene 3: Third narration here..."></textarea>
     <script>
         let API_KEY = '';
         const API_URL = window.location.origin;
-        let allSpeakers = [];
+        let allSpeakers = {};  // Changed to object to hold speakers by provider
+        let currentProvider = 'edge-tts';
         let favorites = JSON.parse(localStorage.getItem('speakerFavorites') || '[]');
         let currentAudio = null;
         let currentPlayingBtn = null;
@@ -901,35 +907,74 @@ Scene 3: Third narration here..."></textarea>
             }
         }
 
-        // Speaker tab switching
-        function switchSpeakerTab(tab) {
-            document.querySelectorAll('.speaker-tab').forEach(t => t.classList.remove('active'));
-            if (tab === 'all') {
-                document.querySelector('.speaker-tab:nth-child(1)').classList.add('active');
-            } else {
-                document.querySelector('.speaker-tab:nth-child(2)').classList.add('active');
-            }
-            renderSpeakers(tab === 'favorites');
+        // TTS Provider switching
+        function switchTtsProvider() {
+            const provider = document.getElementById('ttsProvider').value;
+            currentProvider = provider;
+            document.getElementById('selectedTtsProvider').value = provider;
+            
+            // Switch to the corresponding tab
+            switchProviderTab(provider);
         }
 
-        // Load speakers
+        // Provider tab switching
+        function switchProviderTab(provider) {
+            document.querySelectorAll('.speaker-tab').forEach(t => t.classList.remove('active'));
+            const activeTab = document.querySelector(`.speaker-tab[data-provider="${provider}"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+            
+            // Show/hide Edge TTS options
+            const edgeOptions = document.getElementById('edgeTtsOptions');
+            if (provider === 'edge-tts') {
+                edgeOptions.style.display = 'block';
+            } else {
+                edgeOptions.style.display = 'none';
+            }
+            
+            currentProvider = provider;
+            document.getElementById('selectedTtsProvider').value = provider;
+            
+            // Update TTS provider select if needed
+            if (provider !== 'favorites') {
+                document.getElementById('ttsProvider').value = provider;
+            }
+            
+            renderSpeakers(provider === 'favorites');
+        }
+
+        // Load speakers from all providers
         async function loadSpeakers() {
             const speakerList = document.getElementById('speakerList');
             speakerList.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading speakers...</p></div>';
 
             try {
-                const response = await fetch(`${API_URL}/speakers`, {
-                    headers: {
-                        'X-API-KEY': API_KEY
-                    }
+                // Load Edge TTS speakers
+                const edgeResponse = await fetch(`${API_URL}/speakers`, {
+                    headers: { 'X-API-KEY': API_KEY }
                 });
+                allSpeakers['edge-tts'] = edgeResponse.ok ? await edgeResponse.json() : [];
 
-                if (!response.ok) throw new Error('Failed to load speakers');
+                // Load Gemini TTS speakers
+                const geminiResponse = await fetch(`${API_URL}/speakers/gemini`, {
+                    headers: { 'X-API-KEY': API_KEY }
+                });
+                allSpeakers['gemini-tts'] = geminiResponse.ok ? await geminiResponse.json() : [];
+
+                // Load Pollinations TTS speakers
+                const pollinationsResponse = await fetch(`${API_URL}/speakers/pollinations`, {
+                    headers: { 'X-API-KEY': API_KEY }
+                });
+                allSpeakers['pollinations-tts'] = pollinationsResponse.ok ? await pollinationsResponse.json() : [];
                 
-                allSpeakers = await response.json();
-                
-                // Populate language filter
-                const languages = [...new Set(allSpeakers.map(s => s.locale.split('-')[0]))].sort();
+                // Populate language filter with all unique locales
+                const allLocales = [
+                    ...allSpeakers['edge-tts'].map(s => s.locale),
+                    ...allSpeakers['gemini-tts'].map(s => s.locale),
+                    ...allSpeakers['pollinations-tts'].map(s => s.locale)
+                ];
+                const languages = [...new Set(allLocales.filter(l => l !== 'multi').map(s => s.split('-')[0]))].sort();
                 const langSelect = document.getElementById('filterLanguage');
                 langSelect.innerHTML = '<option value="">All Languages</option>' +
                     languages.map(lang => `<option value="${lang}">${lang.toUpperCase()}</option>`).join('');
@@ -942,7 +987,7 @@ Scene 3: Third narration here..."></textarea>
 
         // Filter speakers
         function filterSpeakers() {
-            renderSpeakers(document.querySelector('.speaker-tab:nth-child(2)').classList.contains('active'));
+            renderSpeakers(currentProvider === 'favorites');
         }
 
         // Render speakers
@@ -952,14 +997,28 @@ Scene 3: Third narration here..."></textarea>
             const langFilter = document.getElementById('filterLanguage').value;
             const genderFilter = document.getElementById('filterGender').value;
 
-            let filteredSpeakers = allSpeakers;
+            // Get speakers for current provider or all if favorites
+            let sourceSpeakers = [];
+            if (showFavoritesOnly) {
+                // Get all speakers from all providers that are favorited
+                sourceSpeakers = [
+                    ...(allSpeakers['edge-tts'] || []),
+                    ...(allSpeakers['gemini-tts'] || []),
+                    ...(allSpeakers['pollinations-tts'] || [])
+                ].filter(s => favorites.includes(s.shortName));
+            } else {
+                sourceSpeakers = allSpeakers[currentProvider] || [];
+            }
+
+            let filteredSpeakers = sourceSpeakers;
 
             // Apply filters
             if (searchTerm) {
                 filteredSpeakers = filteredSpeakers.filter(s => 
                     s.displayName.toLowerCase().includes(searchTerm) ||
                     s.shortName.toLowerCase().includes(searchTerm) ||
-                    s.locale.toLowerCase().includes(searchTerm)
+                    s.locale.toLowerCase().includes(searchTerm) ||
+                    (s.description && s.description.toLowerCase().includes(searchTerm))
                 );
             }
 
@@ -985,17 +1044,28 @@ Scene 3: Third narration here..."></textarea>
             speakerList.innerHTML = filteredSpeakers.map(speaker => {
                 const isFavorite = favorites.includes(speaker.shortName);
                 const isSelected = document.getElementById('selectedSpeaker').value === speaker.shortName;
+                const provider = speaker.provider || currentProvider;
+                
+                // Check if preview is available
+                const previewAvailable = provider === 'edge-tts' || provider === 'gemini-tts';
+                const previewBtn = previewAvailable 
+                    ? `<button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', '${provider}', this)" title="Preview voice">▶</button>`
+                    : `<button class="speaker-btn play-btn" disabled title="Preview unavailable" style="opacity: 0.5; cursor: not-allowed;">🔇</button>`;
+                
                 return `
-                    <div class="speaker-item ${isSelected ? 'selected' : ''}" onclick="selectSpeaker('${speaker.shortName}', this)">
+                    <div class="speaker-item ${isSelected ? 'selected' : ''}" onclick="selectSpeaker('${speaker.shortName}', '${provider}', this)">
                         <div class="speaker-info">
                             <div class="speaker-name">
                                 ${speaker.displayName}
                                 <span class="gender-badge ${speaker.gender}">${speaker.gender}</span>
+                                ${provider === 'gemini-tts' ? '<span class="gender-badge" style="background: #e1bee7; color: #6a1b9a;">✨ Premium</span>' : ''}
+                                ${provider === 'pollinations-tts' ? '<span class="gender-badge" style="background: #c8e6c9; color: #2e7d32;">🌱 Free</span>' : ''}
                             </div>
                             <div class="speaker-meta">${speaker.locale} | ${speaker.shortName}</div>
+                            ${speaker.description ? `<div class="speaker-meta" style="font-style: italic;">${speaker.description}</div>` : ''}
                         </div>
                         <div class="speaker-actions" onclick="event.stopPropagation()">
-                            <button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', this)" title="Preview voice">▶</button>
+                            ${previewBtn}
                             <button class="speaker-btn fav-btn ${isFavorite ? 'favorited' : ''}" onclick="toggleFavorite('${speaker.shortName}', this)" title="Add to favorites">${isFavorite ? '★' : '☆'}</button>
                         </div>
                     </div>
@@ -1004,10 +1074,13 @@ Scene 3: Third narration here..."></textarea>
         }
 
         // Select speaker
-        function selectSpeaker(shortName, element) {
+        function selectSpeaker(shortName, provider, element) {
             document.querySelectorAll('.speaker-item').forEach(item => item.classList.remove('selected'));
             element.classList.add('selected');
             document.getElementById('selectedSpeaker').value = shortName;
+            document.getElementById('selectedTtsProvider').value = provider;
+            // Also update the TTS provider select
+            document.getElementById('ttsProvider').value = provider;
         }
 
         // Toggle favorite
@@ -1204,12 +1277,25 @@ Scene 3: Third narration here..."></textarea>
         }
 
         // Play voice preview using streaming TTS API
-        async function playVoice(shortName, btn) {
-            // Check if client-side streaming is enabled
-            const useClientSide = document.getElementById('useClientSideTTS') && document.getElementById('useClientSideTTS').checked;
+        async function playVoice(shortName, provider, btn) {
+            // Check if client-side streaming is enabled (Edge TTS only)
+            const useClientSide = provider === 'edge-tts' && document.getElementById('useClientSideTTS') && document.getElementById('useClientSideTTS').checked;
             
             if (useClientSide) {
                 playVoiceClientSide(shortName, btn);
+                return;
+            }
+
+            // For Gemini TTS, we would need to have sample audio files downloaded
+            // For now, show a message that preview will be available soon
+            if (provider === 'gemini-tts') {
+                alert('Gemini TTS voice preview: Sample audio files will be downloaded and made available soon.');
+                return;
+            }
+
+            // For Pollinations TTS, preview is not available
+            if (provider === 'pollinations-tts') {
+                alert('Pollinations TTS does not support preview. Voice will be generated when you create a story.');
                 return;
             }
 
@@ -1317,6 +1403,7 @@ Scene 3: Third narration here..."></textarea>
                 genre: document.getElementById('genre').value,
                 language: document.getElementById('language').value,
                 speaker: document.getElementById('selectedSpeaker').value,
+                ttsProvider: document.getElementById('selectedTtsProvider').value || document.getElementById('ttsProvider').value,
                 orientation: document.getElementById('orientation').value,
                 modelProvider: document.getElementById('modelProvider').value,
                 imageStyle: document.getElementById("imageStyle").value || null,

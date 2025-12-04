@@ -22,6 +22,7 @@ export enum VideoOrientation {
 export enum TtsProvider {
   EDGE_TTS = 'edge-tts',
   GEMINI_TTS = 'gemini-tts',
+  POLLINATIONS_TTS = 'pollinations-tts',
 }
 
 export enum ImageStyle {
