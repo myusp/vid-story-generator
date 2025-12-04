@@ -13,7 +13,7 @@ import { LogsService } from '../logs/logs.service';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SrtGenerator } from '../../common/utils/srt-generator';
-import { TtsService } from '../../common/tts/tts.service';
+import { TtsCoordinatorService } from '../../common/tts/tts-coordinator.service';
 import { TtsQueueService } from '../../common/tts/tts-queue.service';
 import type { SubtitleWordBoundary } from '../../common/tts/tts.service';
 import { textToProsodySegments } from '../../common/utils/punctuation-splitter';
@@ -27,7 +27,7 @@ export class StoryService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private aiService: AiService,
-    private ttsService: TtsService,
+    private ttsCoordinator: TtsCoordinatorService,
     private ttsQueueService: TtsQueueService,
     private imageService: ImageService,
     private ffmpegService: FfmpegService,
@@ -124,6 +124,7 @@ export class StoryService {
         genre: dto.genre,
         language: dto.language,
         speakerCode: dto.speaker,
+        ttsProvider: dto.ttsProvider || 'edge-tts',
         orientation: dto.orientation,
         totalImages,
         modelProvider: dto.modelProvider,
@@ -640,8 +641,11 @@ export class StoryService {
                       projectId,
                       'INFO',
                       'GENERATING_TTS',
-                      `Generating audio for scene ${scene.order}/${scenesNeedingAudio.length} (attempt ${attempt}/${maxRetries})...`,
+                      `Generating audio for scene ${scene.order}/${scenesNeedingAudio.length} (attempt ${attempt}/${maxRetries}) using ${project.ttsProvider || 'edge-tts'}...`,
                     );
+
+                    const ttsProvider = (project.ttsProvider ||
+                      'edge-tts') as 'edge-tts' | 'gemini-tts';
 
                     if (scene.prosodyData) {
                       try {
@@ -649,27 +653,30 @@ export class StoryService {
                           scene.prosodyData as string,
                         );
                         result =
-                          await this.ttsService.generateSpeechWithProsody(
+                          await this.ttsCoordinator.generateSpeechWithProsody(
                             prosodySegments,
                             project.speakerCode,
                             audioPath,
+                            ttsProvider,
                           );
                       } catch (parseError) {
                         this.logger.warn(
                           `Prosody parsing failed for scene ${scene.order}: ${parseError.message}`,
                         );
-                        result = await this.ttsService.generateSpeech(
+                        result = await this.ttsCoordinator.generateSpeech(
                           scene.narration,
                           project.speakerCode,
                           audioPath,
+                          ttsProvider,
                           false,
                         );
                       }
                     } else {
-                      result = await this.ttsService.generateSpeech(
+                      result = await this.ttsCoordinator.generateSpeech(
                         scene.narration,
                         project.speakerCode,
                         audioPath,
+                        ttsProvider,
                         false,
                       );
                     }

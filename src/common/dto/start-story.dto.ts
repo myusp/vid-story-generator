@@ -19,6 +19,11 @@ export enum VideoOrientation {
   LANDSCAPE = 'LANDSCAPE',
 }
 
+export enum TtsProvider {
+  EDGE_TTS = 'edge-tts',
+  GEMINI_TTS = 'gemini-tts',
+}
+
 export enum ImageStyle {
   REALISTIC = 'realistic',
   CARTOON = 'cartoon',
@@ -90,11 +95,21 @@ export class StartStoryDto {
   language: string;
 
   @ApiProperty({
-    description: 'Edge-TTS speaker code',
+    description: 'Edge-TTS speaker code or Gemini TTS voice name',
     example: 'id-ID-ArdiNeural',
   })
   @IsString()
   speaker: string;
+
+  @ApiProperty({
+    description: 'TTS provider to use',
+    enum: TtsProvider,
+    example: TtsProvider.EDGE_TTS,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(TtsProvider)
+  ttsProvider?: TtsProvider;
 
   @ApiProperty({
     description: 'Video orientation',

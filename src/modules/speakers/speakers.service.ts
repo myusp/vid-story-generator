@@ -2,12 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { EdgeTTS } from 'edge-tts-universal';
 import { TtsService } from '../../common/tts/tts.service';
+import { GeminiTtsService } from '../../common/tts/gemini-tts.service';
 
 @Injectable()
 export class SpeakersService {
   private readonly logger = new Logger(SpeakersService.name);
 
-  constructor(private ttsService: TtsService) {}
+  constructor(
+    private ttsService: TtsService,
+    private geminiTtsService: GeminiTtsService,
+  ) {}
 
   async listAvailableSpeakers() {
     try {
@@ -20,8 +24,30 @@ export class SpeakersService {
         displayName: voice.displayName || voice.name,
         locale: voice.locale,
         gender: voice.gender,
+        provider: 'edge-tts',
       }));
     } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * List Gemini TTS speakers
+   */
+  async listGeminiSpeakers() {
+    try {
+      const voices = this.geminiTtsService.listVoices();
+
+      return voices.map((voice) => ({
+        name: `${voice.name}-${voice.gender}`,
+        shortName: voice.name,
+        displayName: voice.name,
+        locale: 'multi', // Gemini TTS voices are multilingual
+        gender: voice.gender,
+        provider: 'gemini-tts',
+      }));
+    } catch (error) {
+      this.logger.error(`Failed to list Gemini TTS voices: ${error.message}`);
       return [];
     }
   }
