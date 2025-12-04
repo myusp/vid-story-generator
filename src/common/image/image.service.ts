@@ -52,7 +52,7 @@ export class ImageService {
     try {
       // Polinations AI URL format
       const encodedPrompt = encodeURIComponent(prompt);
-      const imageUrl = `${this.baseUrl}/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&model=flux`;
+      const imageUrl = `${this.baseUrl}/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&model=flux&enhance=true`;
 
       this.logger.log(
         `Generating image for prompt: ${prompt.substring(0, 50)}...`,
