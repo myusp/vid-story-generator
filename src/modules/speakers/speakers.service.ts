@@ -47,6 +47,7 @@ export class SpeakersService {
         locale: 'multi', // Gemini TTS voices are multilingual
         gender: voice.gender,
         provider: 'gemini-tts',
+        sampleUrl: voice.sampleUrl || '',
       }));
     } catch (error) {
       this.logger.error(`Failed to list Gemini TTS voices: ${error.message}`);

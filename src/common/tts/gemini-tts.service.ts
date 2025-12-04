@@ -46,36 +46,156 @@ export class GeminiTtsService {
 
   // List of Gemini TTS voices based on documentation
   private readonly geminiVoices: GeminiVoice[] = [
-    { name: 'Achernar', gender: 'Female' },
-    { name: 'Achird', gender: 'Male' },
-    { name: 'Algenib', gender: 'Male' },
-    { name: 'Algieba', gender: 'Male' },
-    { name: 'Alnilam', gender: 'Male' },
-    { name: 'Aoede', gender: 'Female' },
-    { name: 'Autonoe', gender: 'Female' },
-    { name: 'Callirrhoe', gender: 'Female' },
-    { name: 'Charon', gender: 'Male' },
-    { name: 'Despina', gender: 'Female' },
-    { name: 'Enceladus', gender: 'Male' },
-    { name: 'Erinome', gender: 'Female' },
-    { name: 'Fenrir', gender: 'Male' },
-    { name: 'Gacrux', gender: 'Female' },
-    { name: 'Iapetus', gender: 'Male' },
-    { name: 'Kore', gender: 'Female' },
-    { name: 'Laomedeia', gender: 'Female' },
-    { name: 'Leda', gender: 'Female' },
-    { name: 'Orus', gender: 'Male' },
-    { name: 'Pulcherrima', gender: 'Female' },
-    { name: 'Puck', gender: 'Male' },
-    { name: 'Rasalgethi', gender: 'Male' },
-    { name: 'Sadachbia', gender: 'Male' },
-    { name: 'Sadaltager', gender: 'Male' },
-    { name: 'Schedar', gender: 'Male' },
-    { name: 'Sulafat', gender: 'Female' },
-    { name: 'Umbriel', gender: 'Male' },
-    { name: 'Vindemiatrix', gender: 'Female' },
-    { name: 'Zephyr', gender: 'Female' },
-    { name: 'Zubenelgenubi', gender: 'Male' },
+    {
+      name: 'Achernar',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-achernar.wav',
+    },
+    {
+      name: 'Achird',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-achird.wav',
+    },
+    {
+      name: 'Algenib',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-algenib.wav',
+    },
+    {
+      name: 'Algieba',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-algieba.wav',
+    },
+    {
+      name: 'Alnilam',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-alnilam.wav',
+    },
+    {
+      name: 'Aoede',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-aoeda.wav',
+    },
+    {
+      name: 'Autonoe',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-autonoe.wav',
+    },
+    {
+      name: 'Callirrhoe',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-callirrhoe.wav',
+    },
+    {
+      name: 'Charon',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-charon.wav',
+    },
+    {
+      name: 'Despina',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-despina.wav',
+    },
+    {
+      name: 'Enceladus',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-enceladus.wav',
+    },
+    {
+      name: 'Erinome',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-erinome.wav',
+    },
+    {
+      name: 'Fenrir',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-fenrir.wav',
+    },
+    {
+      name: 'Gacrux',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-gacrux.wav',
+    },
+    {
+      name: 'Iapetus',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-iapetus.wav',
+    },
+    {
+      name: 'Kore',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-kore.wav',
+    },
+    {
+      name: 'Laomedeia',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-laomedeia.wav',
+    },
+    {
+      name: 'Leda',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-leda.wav',
+    },
+    {
+      name: 'Orus',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-orus.wav',
+    },
+    {
+      name: 'Pulcherrima',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-pulcherrima.wav',
+    },
+    {
+      name: 'Puck',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-puck.wav',
+    },
+    {
+      name: 'Rasalgethi',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-rasalgethi.wav',
+    },
+    {
+      name: 'Sadachbia',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-sadachbia.wav',
+    },
+    {
+      name: 'Sadaltager',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-sadaltager.wav',
+    },
+    {
+      name: 'Schedar',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-schedar.wav',
+    },
+    {
+      name: 'Sulafat',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-sulafat.wav',
+    },
+    {
+      name: 'Umbriel',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-umbriel.wav',
+    },
+    {
+      name: 'Vindemiatrix',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-vindemiatrix.wav',
+    },
+    {
+      name: 'Zephyr',
+      gender: 'Female',
+      sampleUrl: '/voices/gemini/chirp3-hd-zephyr.wav',
+    },
+    {
+      name: 'Zubenelgenubi',
+      gender: 'Male',
+      sampleUrl: '/voices/gemini/chirp3-hd-zubenelgenubi.wav',
+    },
   ];
 
   constructor(
@@ -103,128 +223,153 @@ export class GeminiTtsService {
     wordBoundaries: SubtitleWordBoundary[];
   }> {
     this.logger.log(`Starting Gemini TTS generation for ${outputPath}`);
-    try {
-      // Ensure output directory exists
-      const outputDir = path.dirname(outputPath);
-      await fs.mkdir(outputDir, { recursive: true });
 
-      // Get API key from rolling service
-      const apiKey = this.apiKeyRolling.getNextGeminiTtsKey();
+    // Retry logic for transient errors
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      // Initialize Gemini AI
-      const ai = new GoogleGenAI({
-        apiKey,
-      });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Ensure output directory exists
+        const outputDir = path.dirname(outputPath);
+        await fs.mkdir(outputDir, { recursive: true });
 
-      // Configure TTS settings
-      const config: any = {
-        temperature: 1,
-        responseModalities: ['audio'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: voiceName,
+        // Get API key from rolling service
+        const apiKey = this.apiKeyRolling.getNextGeminiTtsKey();
+
+        // Initialize Gemini AI
+        const ai = new GoogleGenAI({
+          apiKey,
+        });
+
+        // Prepare the text - if style prompt is provided, prepend it to the text
+        let finalText = text;
+        if (stylePrompt) {
+          finalText = `${stylePrompt}\n\n${text}`;
+          this.logger.log(`Using style prompt: ${stylePrompt}`);
+        }
+
+        // Configure TTS settings - simplified to avoid API errors
+        const config: any = {
+          temperature: 1,
+          responseModalities: ['audio'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName,
+              },
             },
           },
-        },
-      };
-
-      // Add system instruction if style prompt is provided
-      if (stylePrompt) {
-        config.systemInstruction = {
-          parts: [{ text: stylePrompt }],
         };
-      }
 
-      const contents = [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: text,
-            },
-          ],
-        },
-      ];
+        const contents = [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: finalText,
+              },
+            ],
+          },
+        ];
 
-      // Generate content stream
-      this.logger.log(
-        `Calling Gemini TTS API with voice: ${voiceName}${stylePrompt ? ` and style: ${stylePrompt}` : ''}`,
-      );
-      const response = await ai.models.generateContentStream({
-        model: this.geminiTtsModel,
-        config,
-        contents,
-      });
+        // Generate content stream
+        this.logger.log(
+          `Calling Gemini TTS API (attempt ${attempt}/${maxRetries}) with voice: ${voiceName}`,
+        );
+        const response = await ai.models.generateContentStream({
+          model: this.geminiTtsModel,
+          config,
+          contents,
+        });
 
-      const audioChunks: Buffer[] = [];
+        const audioChunks: Buffer[] = [];
 
-      // Process stream chunks
-      for await (const chunk of response) {
-        if (
-          !chunk.candidates ||
-          !chunk.candidates[0].content ||
-          !chunk.candidates[0].content.parts
-        ) {
-          continue;
-        }
-
-        if (chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
-          const inlineData = chunk.candidates[0].content.parts[0].inlineData;
-          const fileExtension = mime.getExtension(inlineData.mimeType || '');
-          let buffer: Buffer;
-
-          // When MIME type doesn't have a recognized extension (e.g., raw PCM),
-          // we need to add WAV headers to make it playable
-          if (!fileExtension) {
-            buffer = this.convertToWav(
-              inlineData.data || '',
-              inlineData.mimeType || '',
-            );
-          } else {
-            // For recognized formats (mp3, wav, etc.), use the data as-is
-            buffer = Buffer.from(inlineData.data || '', 'base64');
+        // Process stream chunks
+        for await (const chunk of response) {
+          if (
+            !chunk.candidates ||
+            !chunk.candidates[0].content ||
+            !chunk.candidates[0].content.parts
+          ) {
+            continue;
           }
 
-          audioChunks.push(buffer);
+          if (chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+            const inlineData = chunk.candidates[0].content.parts[0].inlineData;
+            const fileExtension = mime.getExtension(inlineData.mimeType || '');
+            let buffer: Buffer;
+
+            // When MIME type doesn't have a recognized extension (e.g., raw PCM),
+            // we need to add WAV headers to make it playable
+            if (!fileExtension) {
+              buffer = this.convertToWav(
+                inlineData.data || '',
+                inlineData.mimeType || '',
+              );
+            } else {
+              // For recognized formats (mp3, wav, etc.), use the data as-is
+              buffer = Buffer.from(inlineData.data || '', 'base64');
+            }
+
+            audioChunks.push(buffer);
+          }
+        }
+
+        if (audioChunks.length === 0) {
+          throw new Error('No audio data received from Gemini TTS');
+        }
+
+        // Concatenate all audio chunks
+        const finalAudioBuffer = Buffer.concat(audioChunks);
+
+        // Save audio file
+        this.logger.log(`Saving audio file to ${outputPath}`);
+        await fs.writeFile(outputPath, finalAudioBuffer);
+
+        // Get audio duration
+        const durationMs = await this.estimateAudioDuration(outputPath);
+
+        // Generate simple timestamps
+        const timestamps = this.generateSimpleTimestamps(text, durationMs);
+
+        // For now, no word boundaries from Gemini TTS
+        const wordBoundaries: SubtitleWordBoundary[] = [];
+
+        this.logger.log(
+          `Generated Gemini TTS speech: ${outputPath} (${durationMs}ms)`,
+        );
+
+        return {
+          audioPath: outputPath,
+          durationMs,
+          timestamps,
+          wordBoundaries,
+        };
+      } catch (error) {
+        lastError = error;
+        this.logger.error(
+          `Gemini TTS synthesis failed (attempt ${attempt}/${maxRetries}): ${error.message}`,
+        );
+
+        // If it's a 500 error and we have retries left, wait and try again
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+          this.logger.log(`Retrying in ${waitTime}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          continue;
         }
       }
-
-      if (audioChunks.length === 0) {
-        throw new Error('No audio data received from Gemini TTS');
-      }
-
-      // Concatenate all audio chunks
-      const finalAudioBuffer = Buffer.concat(audioChunks);
-
-      // Save audio file
-      this.logger.log(`Saving audio file to ${outputPath}`);
-      await fs.writeFile(outputPath, finalAudioBuffer);
-
-      // Get audio duration
-      const durationMs = await this.estimateAudioDuration(outputPath);
-
-      // Generate simple timestamps
-      const timestamps = this.generateSimpleTimestamps(text, durationMs);
-
-      // For now, no word boundaries from Gemini TTS
-      const wordBoundaries: SubtitleWordBoundary[] = [];
-
-      this.logger.log(
-        `Generated Gemini TTS speech: ${outputPath} (${durationMs}ms)`,
-      );
-
-      return {
-        audioPath: outputPath,
-        durationMs,
-        timestamps,
-        wordBoundaries,
-      };
-    } catch (error) {
-      this.logger.error(`Gemini TTS synthesis failed: ${error.message}`);
-      this.logger.error(error.stack);
-      throw new Error(`Gemini TTS synthesis failed: ${error.message}`);
     }
+
+    // All retries failed
+    this.logger.error(
+      `Gemini TTS synthesis failed after ${maxRetries} attempts`,
+    );
+    this.logger.error(lastError?.stack);
+    throw new Error(
+      `Gemini TTS synthesis failed after ${maxRetries} attempts: ${lastError?.message}`,
+    );
   }
 
   /**

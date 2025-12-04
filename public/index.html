@@ -783,16 +783,26 @@ Scene 3: Third narration here..."></textarea>
                     </label>
                     <div id="animationOptions" class="hidden" style="margin-top: 10px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
                         <p style="margin-bottom: 10px; font-size: 13px; color: #666;">Select which animations are allowed (leave empty for all):</p>
+                        
+                        <!-- Group Selection Buttons -->
+                        <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                            <button type="button" onclick="selectAnimationGroup('all')" style="padding: 6px 12px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; width: auto;">✓ Select All</button>
+                            <button type="button" onclick="selectAnimationGroup('none')" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; width: auto;">✗ Deselect All</button>
+                            <button type="button" onclick="selectAnimationGroup('pan')" style="padding: 6px 12px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; width: auto;">← Pan</button>
+                            <button type="button" onclick="selectAnimationGroup('zoom')" style="padding: 6px 12px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; width: auto;">🔍 Zoom</button>
+                            <button type="button" onclick="selectAnimationGroup('static')" style="padding: 6px 12px; background: #9c27b0; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; width: auto;">⏸ Static & Fade</button>
+                        </div>
+                        
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-left"> Pan Left</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-right"> Pan Right</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-up"> Pan Up</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-down"> Pan Down</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-slow"> Zoom Slow</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-in"> Zoom In</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-out"> Zoom Out</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="static"> Static</label>
-                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="fade"> Fade</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-left" data-group="pan"> Pan Left</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-right" data-group="pan"> Pan Right</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-up" data-group="pan"> Pan Up</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="pan-down" data-group="pan"> Pan Down</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-slow" data-group="zoom"> Zoom Slow</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-in" data-group="zoom"> Zoom In</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="zoom-out" data-group="zoom"> Zoom Out</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="static" data-group="static"> Static</label>
+                            <label class="checkbox-label"><input type="checkbox" name="allowedAnimations" value="fade" data-group="static"> Fade</label>
                         </div>
                     </div>
                 </div>
@@ -1837,6 +1847,41 @@ Scene 3: Third narration here..."></textarea>
             } else {
                 options.classList.add('hidden');
                 toggle.textContent = '(click to expand)';
+            }
+        }
+
+        // Select animation groups
+        function selectAnimationGroup(group) {
+            const checkboxes = document.querySelectorAll('input[name="allowedAnimations"]');
+            
+            switch(group) {
+                case 'all':
+                    checkboxes.forEach(cb => cb.checked = true);
+                    break;
+                case 'none':
+                    checkboxes.forEach(cb => cb.checked = false);
+                    break;
+                case 'pan':
+                    checkboxes.forEach(cb => {
+                        if (cb.getAttribute('data-group') === 'pan') {
+                            cb.checked = true;
+                        }
+                    });
+                    break;
+                case 'zoom':
+                    checkboxes.forEach(cb => {
+                        if (cb.getAttribute('data-group') === 'zoom') {
+                            cb.checked = true;
+                        }
+                    });
+                    break;
+                case 'static':
+                    checkboxes.forEach(cb => {
+                        if (cb.getAttribute('data-group') === 'static') {
+                            cb.checked = true;
+                        }
+                    });
+                    break;
             }
         }
 
