@@ -1,13 +1,14 @@
 # Gemini TTS Integration
 
-This document describes how to use Google's Gemini TTS feature in the vid-story-generator.
+This document describes how to use Google's Gemini TTS and Pollinations TTS features in the vid-story-generator.
 
 ## Overview
 
-The application now supports two TTS (Text-to-Speech) providers:
+The application now supports three TTS (Text-to-Speech) providers:
 
 1. **Edge TTS** (default, free) - Microsoft Edge Text-to-Speech
 2. **Gemini TTS** (requires API key) - Google Gemini AI Text-to-Speech with natural multilingual voices
+3. **Pollinations TTS** (free) - Pollinations AI Text-to-Speech powered by OpenAI
 
 ## Configuration
 
@@ -98,6 +99,7 @@ Content-Type: application/json
 
 - `edge-tts` (default) - Use Microsoft Edge TTS with Edge voice codes (e.g., `id-ID-ArdiNeural`)
 - `gemini-tts` - Use Google Gemini TTS with Gemini voice names (e.g., `Orus`, `Achernar`)
+- `pollinations-tts` - Use Pollinations TTS with voice names (e.g., `alloy`, `nova`, `shimmer`)
 
 ### Listing Available Voices
 
@@ -110,6 +112,24 @@ GET /speakers
 ```bash
 GET /speakers/gemini
 ```
+
+#### Pollinations TTS Voices
+```bash
+GET /speakers/pollinations
+```
+
+## Available Pollinations TTS Voices
+
+Pollinations TTS provides 6 multilingual voices powered by OpenAI:
+
+- **alloy** - Neutral, professional
+- **echo** - Deep, resonant
+- **fable** - Storyteller vibe
+- **onyx** - Warm, rich
+- **nova** - Bright, friendly
+- **shimmer** - Soft, melodic
+
+All voices are multilingual and work well across different languages.
 
 ## Features
 
@@ -177,17 +197,19 @@ Gemini TTS uses the same API key rotation mechanism as text generation:
 
 Gemini TTS currently doesn't support prosody segments (rate, pitch, volume adjustments). The system will automatically fall back to regular generation and log a warning.
 
-## Comparison: Edge TTS vs Gemini TTS
+## Comparison: Edge TTS vs Gemini TTS vs Pollinations TTS
 
-| Feature | Edge TTS | Gemini TTS |
-|---------|----------|------------|
-| Cost | Free | Paid (API usage) |
-| Voice Quality | Good | Excellent |
-| Languages | 100+ | Multilingual |
-| Prosody Control | ✅ Yes | ❌ No |
-| Word Timestamps | ✅ Yes | ❌ Limited |
-| API Key Required | ❌ No | ✅ Yes |
-| Setup Difficulty | Easy | Easy |
+| Feature | Edge TTS | Gemini TTS | Pollinations TTS |
+|---------|----------|------------|------------------|
+| Cost | Free | Paid (API usage) | Free |
+| Voice Quality | Good | Excellent | Very Good |
+| Languages | 100+ | Multilingual | Multilingual |
+| Voice Count | 400+ | 30 | 6 |
+| Prosody Control | ✅ Yes | ❌ No | ❌ No |
+| Word Timestamps | ✅ Yes | ❌ Limited | ❌ Limited |
+| API Key Required | ❌ No | ✅ Yes | ❌ No |
+| Setup Difficulty | Easy | Easy | Easy |
+| Preview Available | ✅ Yes | 🔄 Coming Soon | ❌ No |
 
 ## Best Practices
 
@@ -224,7 +246,30 @@ const project = await response.json();
 console.log('Project ID:', project.id);
 ```
 
-### Create a story with Edge TTS (default)
+### Create a story with Pollinations TTS
+
+```javascript
+const response = await fetch('http://localhost:3000/stories/start', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-api-key': 'your-api-key'
+  },
+  body: JSON.stringify({
+    topic: 'A day in the life of a cat',
+    genre: 'comedy',
+    language: 'en',
+    speaker: 'nova',  // Pollinations voice
+    ttsProvider: 'pollinations-tts',
+    orientation: 'PORTRAIT',
+    totalImages: 8,
+    modelProvider: 'gemini'
+  })
+});
+
+const project = await response.json();
+console.log('Project ID:', project.id);
+```
 
 ```javascript
 const response = await fetch('http://localhost:3000/stories/start', {

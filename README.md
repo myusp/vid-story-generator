@@ -23,6 +23,7 @@ Backend API for generating AI-powered short video stories with Azure TTS and Pol
 - **Swagger** - API documentation
 - **Edge TTS** - Free Text-to-Speech (Microsoft)
 - **Gemini TTS** - Premium Text-to-Speech (Google)
+- **Pollinations TTS** - Free Text-to-Speech (Pollinations AI/OpenAI)
 - **Polinations AI** - Image generation
 - **FFmpeg** - Video rendering
 - **Google Gemini / OpenAI** - Story generation
@@ -62,10 +63,11 @@ See `.env.example` for all required environment variables.
 
 ### TTS Providers
 
-The application supports two TTS providers:
+The application supports three TTS providers:
 
-1. **Edge TTS** (default, free) - No API key required, 100+ voices in multiple languages
+1. **Edge TTS** (default, free) - No API key required, 400+ voices in 100+ languages
 2. **Gemini TTS** (premium) - Requires Gemini API key, 30 natural-sounding multilingual voices
+3. **Pollinations TTS** (free) - No API key required, 6 high-quality voices powered by OpenAI
 
 For detailed information about Gemini TTS setup and usage, see [docs/GEMINI_TTS.md](docs/GEMINI_TTS.md).
 
@@ -99,9 +101,10 @@ Swagger documentation at `http://localhost:3000/api`
 
 - `GET /speakers` - List available Edge TTS speakers
 - `GET /speakers/gemini` - List available Gemini TTS speakers
+- `GET /speakers/pollinations` - List available Pollinations TTS speakers
 - `GET /speakers/locale?locale=en-US` - Filter speakers by locale
 - `GET /speakers/popular` - Get popular/commonly used speakers
-- `GET /speakers/preview?speaker=<name>&text=<text>` - Preview speaker voice
+- `GET /speakers/preview?speaker=<name>&text=<text>` - Preview speaker voice (Edge TTS only)
 
 ## Project Structure
 
