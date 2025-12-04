@@ -106,6 +106,41 @@ export class TtsCoordinatorService {
   }
 
   /**
+   * Generate speech with style instruction (for Gemini TTS)
+   */
+  async generateSpeechWithStyle(
+    text: string,
+    style: string,
+    speaker: string,
+    outputPath: string,
+    provider: TtsProvider = 'gemini-tts',
+  ): Promise<{
+    audioPath: string;
+    durationMs: number;
+    timestamps: WordTimestamp[];
+    wordBoundaries: SubtitleWordBoundary[];
+  }> {
+    this.logger.log(
+      `Generating speech with style "${style}" using ${provider} provider`,
+    );
+
+    if (provider === 'gemini-tts') {
+      return await this.geminiTtsService.generateSpeech(
+        text,
+        speaker,
+        outputPath,
+        style,
+      );
+    } else {
+      // Fallback for other providers that don't support style instructions
+      this.logger.warn(
+        `${provider} does not support style instructions, using regular generation`,
+      );
+      return await this.generateSpeech(text, speaker, outputPath, provider);
+    }
+  }
+
+  /**
    * List available voices for the specified provider
    */
   async listVoices(provider: TtsProvider = 'edge-tts') {

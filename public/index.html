@@ -1079,11 +1079,12 @@ Scene 3: Third narration here..."></textarea>
                 const isFavorite = favorites.includes(speaker.shortName);
                 const isSelected = document.getElementById('selectedSpeaker').value === speaker.shortName;
                 const provider = speaker.provider || currentProvider;
+                const sampleUrl = speaker.sampleUrl || '';
                 
                 // Check if preview is available
-                const previewAvailable = provider === 'edge-tts' || provider === 'gemini-tts';
+                const previewAvailable = provider === 'edge-tts' || (provider === 'gemini-tts' && sampleUrl);
                 const previewBtn = previewAvailable 
-                    ? `<button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', '${provider}', this)" title="Preview voice">▶</button>`
+                    ? `<button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', '${provider}', this, '${sampleUrl}')" title="Preview voice">▶</button>`
                     : `<button class="speaker-btn play-btn" disabled title="Preview unavailable" style="opacity: 0.5; cursor: not-allowed;">🔇</button>`;
                 
                 return `
@@ -1311,19 +1312,12 @@ Scene 3: Third narration here..."></textarea>
         }
 
         // Play voice preview using streaming TTS API
-        async function playVoice(shortName, provider, btn) {
+        async function playVoice(shortName, provider, btn, sampleUrl = null) {
             // Check if client-side streaming is enabled (Edge TTS only)
             const useClientSide = provider === 'edge-tts' && document.getElementById('useClientSideTTS') && document.getElementById('useClientSideTTS').checked;
             
             if (useClientSide) {
                 playVoiceClientSide(shortName, btn);
-                return;
-            }
-
-            // For Gemini TTS, we would need to have sample audio files downloaded
-            // For now, show a message that preview will be available soon
-            if (provider === 'gemini-tts') {
-                alert('Gemini TTS voice preview: Sample audio files will be downloaded and made available soon.');
                 return;
             }
 
@@ -1357,8 +1351,13 @@ Scene 3: Third narration here..."></textarea>
             currentPlayingBtn = btn;
 
             try {
-                // Use the streaming TTS preview API endpoint
-                const previewUrl = `${API_URL}/speakers/preview?speaker=${encodeURIComponent(shortName)}`;
+                // Use the streaming TTS preview API endpoint or sample URL
+                let previewUrl;
+                if (sampleUrl) {
+                    previewUrl = sampleUrl;
+                } else {
+                    previewUrl = `${API_URL}/speakers/preview?speaker=${encodeURIComponent(shortName)}`;
+                }
                 
                 // Create audio element and stream the preview
                 const audio = new Audio(previewUrl);
@@ -1382,8 +1381,12 @@ Scene 3: Third narration here..."></textarea>
                     btn.classList.remove('playing');
                     currentPlayingBtn = null;
                     currentAudio = null;
-                    // Fallback to browser speech synthesis
-                    fallbackToSpeechSynthesis(shortName, btn);
+                    // Fallback to browser speech synthesis only if not using a sample URL
+                    if (!sampleUrl) {
+                        fallbackToSpeechSynthesis(shortName, btn);
+                    } else {
+                        alert('Failed to play voice sample.');
+                    }
                 };
                 
                 // Start loading the audio
@@ -1393,8 +1396,10 @@ Scene 3: Third narration here..."></textarea>
                 btn.classList.remove('playing');
                 currentPlayingBtn = null;
                 console.error('Voice preview failed:', error);
-                // Fallback to browser speech synthesis
-                fallbackToSpeechSynthesis(shortName, btn);
+                // Fallback to browser speech synthesis only if not using a sample URL
+                if (!sampleUrl) {
+                    fallbackToSpeechSynthesis(shortName, btn);
+                }
             }
         }
 

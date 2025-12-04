@@ -13,6 +13,7 @@ const execAsync = promisify(exec);
 export interface GeminiVoice {
   name: string;
   gender: 'Male' | 'Female';
+  sampleUrl?: string;
 }
 
 export interface WordTimestamp {
@@ -94,6 +95,7 @@ export class GeminiTtsService {
     text: string,
     voiceName: string,
     outputPath: string,
+    stylePrompt?: string,
   ): Promise<{
     audioPath: string;
     durationMs: number;
@@ -115,7 +117,7 @@ export class GeminiTtsService {
       });
 
       // Configure TTS settings
-      const config = {
+      const config: any = {
         temperature: 1,
         responseModalities: ['audio'],
         speechConfig: {
@@ -126,6 +128,13 @@ export class GeminiTtsService {
           },
         },
       };
+
+      // Add system instruction if style prompt is provided
+      if (stylePrompt) {
+        config.systemInstruction = {
+          parts: [{ text: stylePrompt }],
+        };
+      }
 
       const contents = [
         {
@@ -139,7 +148,9 @@ export class GeminiTtsService {
       ];
 
       // Generate content stream
-      this.logger.log(`Calling Gemini TTS API with voice: ${voiceName}`);
+      this.logger.log(
+        `Calling Gemini TTS API with voice: ${voiceName}${stylePrompt ? ` and style: ${stylePrompt}` : ''}`,
+      );
       const response = await ai.models.generateContentStream({
         model: this.geminiTtsModel,
         config,
@@ -220,7 +231,10 @@ export class GeminiTtsService {
    * List available Gemini TTS voices
    */
   listVoices(): GeminiVoice[] {
-    return this.geminiVoices;
+    return this.geminiVoices.map((voice) => ({
+      ...voice,
+      sampleUrl: `/voices/gemini/chirp3-hd-${voice.name.toLowerCase()}.wav`,
+    }));
   }
 
   /**

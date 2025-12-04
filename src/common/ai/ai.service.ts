@@ -687,6 +687,49 @@ Return ONLY the image prompt as plain text, no JSON.`;
   }
 
   /**
+   * Generate style instructions for Gemini TTS
+   */
+  async generateStyleInstructionsBatch(
+    narrations: Array<{ order: number; narration: string }>,
+    narrativeTone: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<Array<{ order: number; style: string }>> {
+    const toneDescription = narrativeTone
+      ? ` with a ${narrativeTone} tone`
+      : '';
+    const narrationsText = narrations
+      .map((n) => `Scene ${n.order}: "${n.narration}"`)
+      .join('\n');
+
+    const prompt = `Generate a style instruction for Gemini TTS for each of these narrations${toneDescription}.
+
+The style instruction should describe HOW the text should be read (e.g., "Read aloud in a warm, welcoming tone", "Read with excitement and energy", "Read in a whisper", "Read with a serious, dramatic tone").
+
+Narrations:
+${narrationsText}
+
+IMPORTANT: You MUST return a result for EACH scene with the EXACT order number specified above.
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "style": "Read aloud in a warm, welcoming tone"
+  }
+]
+
+Generate exactly ${narrations.length} results, one for each scene.`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const results = JSON.parse(this.extractJSON(response));
+
+    return results.map((item: any, index: number) => ({
+      order: item.order != null ? parseInt(String(item.order), 10) : index + 1,
+      style: item.style || 'Read aloud in a neutral tone',
+    }));
+  }
+
+  /**
    * Step 3: Generate prosody segments based on punctuation
    * Replaces AI-based splitting to ensure logical pauses at punctuation marks
    * Note: narrativeTone and provider params kept for interface compatibility
