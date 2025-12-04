@@ -352,12 +352,27 @@ export class GeminiTtsService {
           `Gemini TTS synthesis failed (attempt ${attempt}/${maxRetries}): ${error.message}`,
         );
 
-        // If it's a 500 error and we have retries left, wait and try again
-        if (attempt < maxRetries) {
+        // Only retry on specific errors (500 Internal Server Error, rate limits, network timeouts)
+        const shouldRetry =
+          attempt < maxRetries &&
+          (error.message?.includes('500') ||
+            error.message?.includes('INTERNAL') ||
+            error.message?.includes('rate limit') ||
+            error.message?.includes('timeout') ||
+            error.code === 'ECONNRESET' ||
+            error.code === 'ETIMEDOUT');
+
+        if (shouldRetry) {
           const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
           this.logger.log(`Retrying in ${waitTime}ms...`);
           await new Promise((resolve) => setTimeout(resolve, waitTime));
           continue;
+        } else if (attempt < maxRetries) {
+          // Don't retry auth errors or other non-transient errors
+          this.logger.warn(
+            'Error is not retryable (auth error or client error), failing immediately',
+          );
+          break;
         }
       }
     }
