@@ -695,13 +695,23 @@ Scene 3: Third narration here..."></textarea>
 
                 <div class="form-row">
                     <div class="form-group">
+                        <label for="modelProvider">AI Model *</label>
+                        <select id="modelProvider" required>
+                            <option value="gemini">Gemini</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label for="contentType">Content Type</label>
                         <select id="contentType">
                             <option value="story">Story (with characters)</option>
                             <option value="educational">Educational (illustrations/explainer)</option>
                         </select>
                     </div>
+                </div>
 
+                <div class="form-row">
                     <div class="form-group">
                         <label for="ttsProvider">TTS Provider *</label>
                         <select id="ttsProvider" required onchange="switchTtsProvider()">
@@ -709,6 +719,14 @@ Scene 3: Third narration here..."></textarea>
                             <option value="gemini-tts">Gemini TTS (Premium)</option>
                             <option value="pollinations-tts">Pollinations TTS (Free)</option>
                         </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <div style="padding: 10px; background: #f5f5f5; border-radius: 8px; font-size: 13px;">
+                            <strong>TTS Provider Info:</strong><br>
+                            <span id="ttsProviderInfo">Edge TTS: Free, 400+ voices</span>
+                        </div>
                     </div>
                 </div>
 
@@ -912,6 +930,22 @@ Scene 3: Third narration here..."></textarea>
             const provider = document.getElementById('ttsProvider').value;
             currentProvider = provider;
             document.getElementById('selectedTtsProvider').value = provider;
+            
+            // Update provider info
+            const infoElement = document.getElementById('ttsProviderInfo');
+            if (infoElement) {
+                switch(provider) {
+                    case 'edge-tts':
+                        infoElement.innerHTML = 'Edge TTS: Free, 400+ voices, preview available';
+                        break;
+                    case 'gemini-tts':
+                        infoElement.innerHTML = 'Gemini TTS: Premium (requires API key), 30 natural voices';
+                        break;
+                    case 'pollinations-tts':
+                        infoElement.innerHTML = 'Pollinations TTS: Free, 6 high-quality voices';
+                        break;
+                }
+            }
             
             // Switch to the corresponding tab
             switchProviderTab(provider);

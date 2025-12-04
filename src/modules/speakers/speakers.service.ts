@@ -65,7 +65,7 @@ export class SpeakersService {
         name: voice.name,
         shortName: voice.name,
         displayName: `${voice.name.charAt(0).toUpperCase() + voice.name.slice(1)} - ${voice.description}`,
-        locale: 'multi', // Pollinations TTS voices are multilingual
+        locale: 'en-US', // Pollinations TTS is optimized for English but works with other languages
         gender: 'Neutral', // Pollinations doesn't specify gender
         provider: 'pollinations-tts',
         description: voice.description,

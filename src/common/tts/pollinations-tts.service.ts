@@ -4,6 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import type { WordTimestamp, SubtitleWordBoundary } from './tts.service';
 
 const execAsync = promisify(exec);
 
@@ -12,22 +13,15 @@ export interface PollinationsVoice {
   description: string;
 }
 
-export interface WordTimestamp {
-  word: string;
-  startMs: number;
-  endMs: number;
-}
-
-export interface SubtitleWordBoundary {
-  text: string;
-  offset: number;
-  duration: number;
-}
-
 @Injectable()
 export class PollinationsTtsService {
   private readonly logger = new Logger(PollinationsTtsService.name);
   private readonly baseUrl = 'https://text.pollinations.ai';
+
+  // Audio estimation constants
+  private static readonly BITS_PER_BYTE = 8;
+  private static readonly DEFAULT_BITRATE_KBPS = 128;
+  private static readonly KILOBITS_TO_BITS = 1000;
 
   // List of Pollinations TTS voices based on OpenAI TTS
   private readonly pollinationsVoices: PollinationsVoice[] = [
@@ -132,7 +126,10 @@ export class PollinationsTtsService {
     try {
       const stats = await fs.stat(audioPath);
       // Rough estimation for MP3: assume 128kbps bitrate
-      const durationSeconds = (stats.size * 8) / (128 * 1000);
+      const durationSeconds =
+        (stats.size * PollinationsTtsService.BITS_PER_BYTE) /
+        (PollinationsTtsService.DEFAULT_BITRATE_KBPS *
+          PollinationsTtsService.KILOBITS_TO_BITS);
       return Math.round(durationSeconds * 1000);
     } catch (error) {
       this.logger.warn(`Failed to estimate duration: ${error.message}`);
