@@ -150,7 +150,12 @@ Return ONLY a JSON object in this exact format:
     targetSceneCount: number,
     language: string,
     provider: 'gemini' | 'openai',
+    targetSceneDuration?: number,
   ): Promise<NarrationOnly[]> {
+    const durationHint = targetSceneDuration
+      ? ` (approximately ${targetSceneDuration} seconds when spoken)`
+      : ' (5-15 seconds when spoken)';
+
     const prompt = `You are given a story text. Your task is to split it into ${targetSceneCount} logical scenes for a short video.
 
 Story Text:
@@ -162,8 +167,12 @@ Rules:
 1. Split the text into exactly ${targetSceneCount} scenes
 2. Each scene should be a natural paragraph that flows when spoken
 3. Maintain the original story's flow and meaning
-4. Each scene narration should be suitable for a single video scene (5-15 seconds when spoken)
+4. Each scene narration should be suitable for a single video scene${durationHint}
 5. Keep the narrations in the same language as the original text (${language})
+6. Use VERY SIMPLE language suitable for a 10-year-old child
+7. Avoid poetic, flowery, or hyperbolic expressions
+8. Use short, direct sentences with common words
+9. Aim for narrations that take about ${targetSceneDuration || '8-10'} seconds to speak aloud
 
 Return ONLY a JSON array in this exact format:
 [
@@ -178,6 +187,43 @@ Return ONLY a JSON array in this exact format:
 ]
 
 Create exactly ${targetSceneCount} scenes.`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const scenes = JSON.parse(this.extractJSON(response));
+
+    return scenes.map((item: any, index: number) => ({
+      order: item.order || index + 1,
+      narration: item.narration,
+    }));
+  }
+
+  /**
+   * Split text into scenes based on target duration per scene
+   */
+  async splitTextByDuration(
+    text: string,
+    targetDurationSec: number,
+    language: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<NarrationOnly[]> {
+    const prompt = `You are a video editor. Split the following text into scenes where each scene takes approximately ${targetDurationSec} seconds to speak.
+
+Text: "${text}"
+Language: ${language}
+
+Rules:
+1. Each scene should be a coherent segment.
+2. Aim for ${targetDurationSec} seconds per scene (roughly ${Math.round(targetDurationSec * 2.5)} words).
+3. Do not change the text content, just split it.
+4. Return a JSON array of objects with "order" and "narration".
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "narration": "first scene narration"
+  }
+]`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const scenes = JSON.parse(this.extractJSON(response));
@@ -246,6 +292,14 @@ Return ONLY a JSON object in this exact format:
 
 Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
 
+IMPORTANT LANGUAGE RULES (STRICT):
+- Use VERY SIMPLE language suitable for a 10-year-old child.
+- DO NOT use complex words, metaphors, or flowery language.
+- DO NOT use hyperbolic expressions (e.g., "shattering the silence", "unimaginable beauty").
+- Keep sentences SHORT and DIRECT.
+- Write as if you are talking to a friend, casually and naturally.
+- Avoid dramatic flair unless specifically requested.
+
 Return ONLY a JSON array in this exact format:
 [
   {
@@ -289,6 +343,14 @@ Style: ${toneDescription}
 
 Generate ONLY the narration text for each scene. Each narration should be a single paragraph that flows naturally when spoken.
 Make it engaging and suitable for shorts format.
+
+IMPORTANT LANGUAGE RULES (STRICT):
+- Use VERY SIMPLE language suitable for a 10-year-old child.
+- DO NOT use complex words, metaphors, or flowery language.
+- DO NOT use hyperbolic expressions (e.g., "shattering the silence", "unimaginable beauty").
+- Keep sentences SHORT and DIRECT.
+- Write as if you are talking to a friend, casually and naturally.
+- Avoid dramatic flair unless specifically requested.
 
 Return ONLY a JSON array in this exact format:
 [
@@ -356,6 +418,7 @@ The descriptions should be detailed enough to generate consistent images across 
     imageStyle: string,
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
+    contentType: string = 'story',
   ): Promise<ImagePromptData[]> {
     const results: ImagePromptData[] = [];
 
@@ -377,6 +440,7 @@ The descriptions should be detailed enough to generate consistent images across 
           provider,
           characterDescriptions,
           previousContext,
+          contentType,
         );
 
         // Create a map for O(1) lookups
@@ -401,6 +465,7 @@ The descriptions should be detailed enough to generate consistent images across 
               provider,
               characterDescriptions,
               prevScene,
+              contentType,
             );
             results.push({
               order: narration.order,
@@ -422,6 +487,7 @@ The descriptions should be detailed enough to generate consistent images across 
             provider,
             characterDescriptions,
             prevScene,
+            contentType,
           );
           results.push({
             order: narration.order,
@@ -440,6 +506,7 @@ The descriptions should be detailed enough to generate consistent images across 
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
     previousContext?: ImagePromptData[],
+    contentType: string = 'story',
   ): Promise<ImagePromptData[]> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
     const narrationsText = narrations
@@ -457,10 +524,10 @@ The descriptions should be detailed enough to generate consistent images across 
       previousSceneContext = `\n\nPREVIOUS SCENES (for continuity - maintain visual consistency):\n${previousContext.map((p) => `Scene ${p.order} image prompt: "${p.imagePrompt.substring(0, AiService.CONTEXT_PREVIEW_LENGTH)}..."`).join('\n')}\n`;
     }
 
-    const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
-${characterContext}${previousSceneContext}
-${narrationsText}
+    // Different prompts for story vs educational content
+    const isEducational = contentType === 'educational';
 
+    const storyPromptRules = `
 For EACH scene listed above, create a prompt that includes:
 - Main subject/characters (use the character descriptions above for consistency if they appear in the scene)
 - Setting/environment (maintain consistency with previous scenes if continuing the same location)
@@ -468,14 +535,53 @@ For EACH scene listed above, create a prompt that includes:
 - Visual details
 - Composition (consider the flow from previous scenes)
 
-IMPORTANT RULES FOR VISUAL CONTINUITY:
+IMPORTANT RULES FOR VISUAL VARIETY AND CONTINUITY:
 1. You MUST return a result for EACH scene with the EXACT order number specified above.
 2. If a character from the character descriptions appears in the scene, use their exact visual description.
 3. Keep character appearances consistent across all scenes.
-4. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration (side view, 3/4 view, etc.)
-5. Characters should be DOING something related to the narration, not just standing/posing.
-6. Maintain visual continuity with the previous scenes - if a scene continues in the same location, keep the setting consistent.
-7. Match the camera angle and perspective to the story action (e.g., if someone is walking, show them from the side; if they're looking at something, show what they see).
+4. **CRITICAL: AVOID PORTRAIT-STYLE IMAGES.** Do NOT always focus on the character's face.
+5. **VARY THE FOCUS:**
+   - Some scenes should focus on the **ENVIRONMENT/SETTING** (wide shot) to establish context.
+   - Some scenes should focus on the **ACTION/EVENT** (medium or full body shot).
+   - Some scenes should focus on **OBJECTS** or **DETAILS** mentioned in the narration (close-up).
+   - Only use close-up of faces when the narration emphasizes emotion.
+6. **USE DIVERSE CAMERA ANGLES:** Wide shots, over-the-shoulder shots, low angles, high angles, point-of-view shots.
+7. Characters should be DOING something related to the narration, not just standing/posing.
+8. Maintain visual continuity with the previous scenes - if a scene continues in the same location, keep the setting consistent.`;
+
+    const educationalPromptRules = `
+For EACH scene listed above, create a UNIQUE and VARIED prompt for an EDUCATIONAL/EXPLAINER illustration.
+
+CRITICAL RULES FOR VARIETY:
+1. Each scene MUST have a DIFFERENT visual approach - DO NOT repeat the same subject/object across scenes.
+2. If the topic involves a concept (like "brain rot"), show DIFFERENT aspects each scene:
+   - Scene 1 might show: a smartphone with social media icons
+   - Scene 2 might show: a clock with attention span visualization  
+   - Scene 3 might show: a dopamine molecule and reward pathway
+   - Scene 4 might show: a comparison of activities (reading vs scrolling)
+3. Use DIVERSE visual metaphors - not the same metaphor repeated.
+
+For EACH scene, create a prompt that includes:
+- A UNIQUE visual representation specific to THAT scene's narration
+- Different objects, scenarios, or metaphors than previous scenes
+- Clean, clear composition focused on the educational message
+- Appropriate background that doesn't distract from the main concept
+
+IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
+1. You MUST return a result for EACH scene with the EXACT order number specified above.
+2. DO NOT include human characters, people, or faces.
+3. DO NOT include any text, labels, words, letters, or numbers in the image.
+4. Each scene MUST have a DIFFERENT main subject/object - avoid repetition.
+5. Use VARIED visual metaphors and symbolic representations.
+6. Maintain visual style consistency (color scheme) but VARY the content.
+7. Think creatively - each scene should surprise with a fresh perspective on the topic.
+8. Focus on objects, abstract shapes, nature elements, technology items, or conceptual art.`;
+
+    const prompt = `Based on these narrations, generate detailed image generation prompts${styleDescription}:
+${characterContext}${previousSceneContext}
+${narrationsText}
+
+${isEducational ? educationalPromptRules : storyPromptRules}
 
 Return ONLY a JSON array in this exact format (one entry for EACH scene):
 [
@@ -505,6 +611,7 @@ Generate exactly ${narrations.length} results, one for each scene.`;
     provider: 'gemini' | 'openai',
     characterDescriptions?: string,
     previousScene?: ImagePromptData | null,
+    contentType: string = 'story',
   ): Promise<string> {
     const styleDescription = imageStyle ? ` in ${imageStyle} style` : '';
     const characterContext = characterDescriptions
@@ -516,10 +623,9 @@ Generate exactly ${narrations.length} results, one for each scene.`;
       previousContext = `\n\nPREVIOUS SCENE (for continuity):\nScene ${previousScene.order} image prompt: "${previousScene.imagePrompt}"\n`;
     }
 
-    const prompt = `Based on this narration: "${narration}"
-${characterContext}${previousContext}
-Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
+    const isEducational = contentType === 'educational';
 
+    const storyPromptContent = `
 The prompt should be in English and describe:
 - Main subject/characters (use the character descriptions above if they appear in this scene)
 - Setting/environment (maintain consistency with previous scene if continuing the same location)
@@ -527,11 +633,34 @@ The prompt should be in English and describe:
 - Visual details
 - Composition
 
-IMPORTANT RULES:
-1. DO NOT make characters face directly at camera like a portrait - show them in action, from angles that match the narration.
-2. Characters should be DOING something related to the narration, not just standing/posing.
-3. Maintain visual continuity with the previous scene if applicable.
-4. Match the camera angle to the story action.
+IMPORTANT RULES FOR VARIETY:
+1. **AVOID PORTRAIT-STYLE IMAGES.** Do NOT focus solely on the character's face unless necessary for emotion.
+2. **VARY THE FOCUS:** Focus on the **EVENT**, **ACTIVITY**, or **SETTING** described in the narration.
+3. **USE DYNAMIC ANGLES:** Use wide shots, over-the-shoulder, or point-of-view shots to show the scene context.
+4. Characters should be DOING something related to the narration, not just standing/posing.
+5. Maintain visual continuity with the previous scene if applicable.
+6. DO NOT include any text, labels, words, letters, or numbers in the image.`;
+
+    const educationalPromptContent = `
+The prompt should be in English and describe a UNIQUE EDUCATIONAL ILLUSTRATION:
+- A specific visual representation of THIS scene's narration content
+- Visual metaphors or representations of abstract concepts
+- Clean, clear composition focused on the educational message
+- Objects, abstract shapes, nature elements, or technology items
+
+IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
+1. DO NOT include human characters, people, or faces.
+2. DO NOT include any text, labels, words, letters, or numbers in the image.
+3. Use visual metaphors and symbolic representations to explain concepts.
+4. Make this scene visually DIFFERENT from previous scenes - use varied subjects.
+5. The illustration should be self-explanatory and support the narration text.
+6. Focus on unique objects or metaphors that haven't been used in previous scenes.`;
+
+    const prompt = `Based on this narration: "${narration}"
+${characterContext}${previousContext}
+Generate a detailed image generation prompt${styleDescription} that visually represents this scene.
+
+${isEducational ? educationalPromptContent : storyPromptContent}
 
 Return ONLY the image prompt as plain text, no JSON.`;
 
@@ -558,79 +687,42 @@ Return ONLY the image prompt as plain text, no JSON.`;
   }
 
   /**
-   * Step 3: Generate prosody segments in batches for expressive speech
-   * Edge-tts-universal supports prosody options (rate, volume, pitch) per synthesis call.
-   * We split narration into segments with different prosody settings for expressive delivery.
+   * Step 3: Generate prosody segments based on punctuation
+   * Replaces AI-based splitting to ensure logical pauses at punctuation marks
+   * Note: narrativeTone and provider params kept for interface compatibility
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async generateProsodyBatch(
     narrations: Array<{ order: number; narration: string }>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     narrativeTone: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     provider: 'gemini' | 'openai',
   ): Promise<ProsodyData[]> {
     const results: ProsodyData[] = [];
 
-    // Process in batches
-    for (let i = 0; i < narrations.length; i += this.batchSize) {
-      const batch = narrations.slice(i, i + this.batchSize);
-      this.logger.log(
-        `Processing prosody batch ${Math.floor(i / this.batchSize) + 1}: scenes ${batch.map((n) => n.order).join(', ')}`,
-      );
-
-      try {
-        const batchResults = await this.generateProsodyBatchInternal(
-          batch,
-          narrativeTone,
-          provider,
-        );
-
-        // Create a map for O(1) lookups
-        const resultMap = new Map(batchResults.map((r) => [r.order, r]));
-
-        // Validate and match back to original narrations
-        for (const narration of batch) {
-          const result = resultMap.get(narration.order);
-          if (result && result.segments && result.segments.length > 0) {
-            results.push(result);
-          } else {
-            // Fallback: create simple prosody data
-            this.logger.warn(
-              `Missing prosody result for scene ${narration.order}, using default`,
-            );
-            results.push({
-              order: narration.order,
-              segments: [
-                {
-                  text: narration.narration,
-                  rate: '+0%',
-                  volume: '+0%',
-                  pitch: '+0Hz',
-                },
-              ],
-            });
-          }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `Prosody batch failed for scenes ${batch.map((n) => n.order).join(', ')}, using defaults: ${error.message}`,
-        );
-        // Fallback: create simple prosody data for each
-        for (const narration of batch) {
-          results.push({
-            order: narration.order,
-            segments: [
-              {
-                text: narration.narration,
-                rate: '+0%',
-                volume: '+0%',
-                pitch: '+0Hz',
-              },
-            ],
-          });
-        }
-      }
+    for (const item of narrations) {
+      const segments = this.splitTextByPunctuation(item.narration);
+      results.push({
+        order: item.order,
+        segments: segments.map((text) => ({
+          text,
+          rate: '+0%',
+          volume: '+0%',
+          pitch: '+0Hz',
+        })),
+      });
     }
 
     return results.sort((a, b) => a.order - b.order);
+  }
+
+  private splitTextByPunctuation(text: string): string[] {
+    // Split by punctuation marks that indicate a pause, keeping the punctuation
+    // Matches: word sequences ending with punctuation, or the end of the string
+    // Punctuation: . , ! ? ; :
+    const parts = text.match(/[^,.;!?]+[,.;!?]+|[^,.;!?]+$/g) || [text];
+    return parts.map((p) => p.trim()).filter((p) => p.length > 0);
   }
 
   private async generateProsodyBatchInternal(

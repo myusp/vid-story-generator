@@ -14,7 +14,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SrtGenerator } from '../../common/utils/srt-generator';
 import { TtsService } from '../../common/tts/tts.service';
+import { TtsQueueService } from '../../common/tts/tts-queue.service';
 import type { SubtitleWordBoundary } from '../../common/tts/tts.service';
+import { textToProsodySegments } from '../../common/utils/punctuation-splitter';
+import pMap from 'p-map';
 
 @Injectable()
 export class StoryService {
@@ -25,6 +28,7 @@ export class StoryService {
     private configService: ConfigService,
     private aiService: AiService,
     private ttsService: TtsService,
+    private ttsQueueService: TtsQueueService,
     private imageService: ImageService,
     private ffmpegService: FfmpegService,
     private logsService: LogsService,
@@ -131,18 +135,47 @@ export class StoryService {
         allowedAnimations: dto.allowedAnimations?.length
           ? JSON.stringify(dto.allowedAnimations)
           : null,
+        contentType: dto.contentType || 'story',
         status: StoryStatus.PENDING,
       },
     });
 
     // If using existing narrations, create scenes immediately
     if (storyMode === 'narrations' && dto.existingNarrations?.length) {
-      for (let i = 0; i < dto.existingNarrations.length; i++) {
+      let narrations = dto.existingNarrations;
+
+      // If target duration is set, split the text using AI
+      if (dto.targetSceneDuration && dto.targetSceneDuration > 0) {
+        const fullText = dto.existingNarrations.join(' ');
+        await this.logMessage(
+          project.id,
+          'INFO',
+          'SPLITTING_TEXT',
+          `Splitting text into scenes of ~${dto.targetSceneDuration}s duration...`,
+        );
+
+        const splitScenes = await this.aiService.splitTextByDuration(
+          fullText,
+          dto.targetSceneDuration,
+          dto.language,
+          dto.modelProvider,
+        );
+        narrations = splitScenes.map((s) => s.narration);
+        totalImages = narrations.length;
+
+        // Update project totalImages
+        await this.prisma.storyProject.update({
+          where: { id: project.id },
+          data: { totalImages },
+        });
+      }
+
+      for (let i = 0; i < narrations.length; i++) {
         await this.prisma.storyScene.create({
           data: {
             projectId: project.id,
             order: i + 1,
-            narration: dto.existingNarrations[i],
+            narration: narrations[i],
           },
         });
       }
@@ -330,11 +363,14 @@ export class StoryService {
         }
       }
 
-      // Step 2.5: Generate character descriptions if not already done
+      // Step 2.5: Generate character descriptions if not already done (skip for educational content)
       // Use updated project data for topic if it was changed
+      const contentType = project.contentType || 'story';
       let characterDescriptions = updatedProject?.characterDescriptions;
       const topicForCharacters = updatedProject?.topic || project.topic;
-      if (!characterDescriptions) {
+
+      // Only generate character descriptions for story content, not educational
+      if (!characterDescriptions && contentType === 'story') {
         await this.logMessage(
           projectId,
           'INFO',
@@ -385,7 +421,8 @@ export class StoryService {
           })),
           project.imageStyle || '',
           provider,
-          characterDescriptions, // Pass character descriptions for consistency
+          characterDescriptions, // Pass character descriptions for consistency (null for educational)
+          contentType, // Pass content type for appropriate image prompt generation
         );
 
         // Update scenes with image prompts
@@ -419,29 +456,10 @@ export class StoryService {
           `Generating prosody segments and animations (${scenesWithoutProsody.length} remaining)...`,
         );
 
-        // Use batch processing for prosody segments
-        const prosodyBatch = await this.aiService.generateProsodyBatch(
-          scenesWithoutProsody.map((s) => ({
-            order: s.order,
-            narration: s.narration,
-          })),
-          project.narrativeTone || '',
-          provider,
-        );
-
-        // Update scenes with prosody data and generate animations
+        // Update scenes with prosody data (punctuation-based) and generate animations
         for (const scene of scenesWithoutProsody) {
-          const prosodyResult = prosodyBatch.find(
-            (s) => s.order === scene.order,
-          );
-          const prosodyData = prosodyResult?.segments || [
-            {
-              text: scene.narration,
-              rate: '+0%',
-              volume: '+0%',
-              pitch: '+0Hz',
-            },
-          ];
+          // Use punctuation-based splitting instead of AI for prosody segments
+          const prosodyData = textToProsodySegments(scene.narration);
 
           // Generate animations with allowed animations filter
           const animations = await this.aiService.generateAnimations(
@@ -462,210 +480,271 @@ export class StoryService {
         }
       }
 
-      // Step 5: Generate images
+      // Step 5 & 6: Generate images and audio concurrently
+      // Both can run in parallel, but audio must be queued globally
       await this.logMessage(
         projectId,
         'INFO',
-        'GENERATING_IMAGES',
-        'Generating images...',
+        'GENERATING_MEDIA',
+        'Generating images and audio concurrently...',
       );
       await this.prisma.storyProject.update({
         where: { id: projectId },
         data: { status: StoryStatus.GENERATING_IMAGES },
       });
 
-      const scenesWithSsml = await this.prisma.storyScene.findMany({
+      const scenesForMedia = await this.prisma.storyScene.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       });
 
-      const imageDir = this.configService.get<string>(
+      // Create project-specific directories (folder-based naming)
+      const baseImageDir = this.configService.get<string>(
         'IMAGE_OUTPUT_DIR',
         './storage/images',
       );
-      const width = project.orientation === 'PORTRAIT' ? 2160 : 3840;
-      const height = project.orientation === 'PORTRAIT' ? 3840 : 2160;
-
-      for (const scene of scenesWithSsml) {
-        // Skip if image already generated
-        if (scene.imagePath && fs.existsSync(scene.imagePath)) {
-          continue;
-        }
-        const imagePath = path.join(
-          imageDir,
-          `${filePrefix}_scene_${scene.order}.jpg`,
-        );
-        await this.imageService.generateImage(
-          scene.imagePrompt,
-          imagePath,
-          width,
-          height,
-        );
-        await this.prisma.storyScene.update({
-          where: { id: scene.id },
-          data: { imagePath },
-        });
-      }
-
-      // Step 6: Generate TTS using prosody segments for expressive speech
-      await this.logMessage(
-        projectId,
-        'INFO',
-        'GENERATING_TTS',
-        'Generating expressive audio with prosody segments...',
-      );
-      await this.prisma.storyProject.update({
-        where: { id: projectId },
-        data: { status: StoryStatus.GENERATING_TTS },
-      });
-
-      const audioDir = this.configService.get<string>(
+      const baseAudioDir = this.configService.get<string>(
         'AUDIO_OUTPUT_DIR',
         './storage/audio',
       );
-      let currentTime = 0;
+      const projectImageDir = path.join(baseImageDir, filePrefix);
+      const projectAudioDir = path.join(baseAudioDir, filePrefix);
+
+      // Ensure project directories exist
+      if (!fs.existsSync(projectImageDir)) {
+        fs.mkdirSync(projectImageDir, { recursive: true });
+      }
+      if (!fs.existsSync(projectAudioDir)) {
+        fs.mkdirSync(projectAudioDir, { recursive: true });
+      }
+
+      const width = project.orientation === 'PORTRAIT' ? 1080 : 1920;
+      const height = project.orientation === 'PORTRAIT' ? 1920 : 1080;
+
+      // Get concurrency from env, default to 4
+      const concurrencyValue = parseInt(
+        this.configService.get<string>('IMAGE_DOWNLOAD_CONCURRENCY', '4'),
+        10,
+      );
+      const imageConcurrency =
+        !isNaN(concurrencyValue) && concurrencyValue > 0 ? concurrencyValue : 4;
+
+      // Prepare word boundaries storage for SRT
       let hasCompleteWordBoundaries = true;
       const globalWordBoundaries: SubtitleWordBoundary[] = [];
       const HNS_PER_MS = 10000;
 
-      const scenesWithImages = await this.prisma.storyScene.findMany({
-        where: { projectId },
-        orderBy: { order: 'asc' },
-      });
-
-      this.logger.log(
-        `Starting TTS generation for ${scenesWithImages.length} scenes`,
+      // Filter scenes that need image or audio generation
+      const scenesNeedingImages = scenesForMedia.filter(
+        (scene) => !scene.imagePath || !fs.existsSync(scene.imagePath),
       );
-      await this.logMessage(
-        projectId,
-        'INFO',
-        'GENERATING_TTS',
-        `Starting TTS generation for ${scenesWithImages.length} scenes...`,
+      const scenesNeedingAudio = scenesForMedia.filter(
+        (scene) => !scene.audioPath || !fs.existsSync(scene.audioPath),
       );
 
-      for (const scene of scenesWithImages) {
-        this.logger.log(
-          `Processing scene ${scene.order}/${scenesWithImages.length}`,
-        );
+      // Run image and audio generation concurrently
+      const [, audioResults] = await Promise.all([
+        // Image generation (concurrent with p-map)
+        (async () => {
+          if (scenesNeedingImages.length === 0) return [];
 
-        // Skip if audio already generated
-        if (scene.audioPath && fs.existsSync(scene.audioPath)) {
-          this.logger.log(`Scene ${scene.order} already has audio, skipping`);
-          currentTime = scene.endTimeMs || currentTime;
+          await this.logMessage(
+            projectId,
+            'INFO',
+            'GENERATING_IMAGES',
+            `Generating ${scenesNeedingImages.length} images...`,
+          );
+
+          // Add delay between image requests to avoid rate limiting
+          const DEFAULT_IMAGE_DELAY_MS = 1000;
+          const imageDelayMs = parseInt(
+            this.configService.get<string>(
+              'IMAGE_REQUEST_DELAY_MS',
+              String(DEFAULT_IMAGE_DELAY_MS),
+            ),
+            10,
+          );
+          const delay =
+            !isNaN(imageDelayMs) && imageDelayMs >= 0
+              ? imageDelayMs
+              : DEFAULT_IMAGE_DELAY_MS;
+
+          return pMap(
+            scenesNeedingImages,
+            async (scene, index) => {
+              // Add delay between requests (except for the first one)
+              if (index > 0 && delay > 0) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+              }
+
+              const imagePath = path.join(
+                projectImageDir,
+                `scene_${scene.order}.jpg`,
+              );
+              await this.imageService.generateImage(
+                scene.imagePrompt,
+                imagePath,
+                width,
+                height,
+              );
+              await this.prisma.storyScene.update({
+                where: { id: scene.id },
+                data: { imagePath },
+              });
+              return { sceneId: scene.id, imagePath };
+            },
+            { concurrency: imageConcurrency },
+          );
+        })(),
+
+        // Audio generation (queued globally to prevent conflicts)
+        (async () => {
+          if (scenesNeedingAudio.length === 0) return [];
+
+          await this.prisma.storyProject.update({
+            where: { id: projectId },
+            data: { status: StoryStatus.GENERATING_TTS },
+          });
+
+          await this.logMessage(
+            projectId,
+            'INFO',
+            'GENERATING_TTS',
+            `Generating audio for ${scenesNeedingAudio.length} scenes (queued)...`,
+          );
+
+          // Use the TTS queue to process audio sequentially across all projects
+          return this.ttsQueueService.enqueue(
+            `project-${projectId}-audio`,
+            async () => {
+              const results: Array<{
+                sceneId: string;
+                audioPath: string;
+                durationMs: number;
+                wordBoundaries: SubtitleWordBoundary[];
+              }> = [];
+
+              for (const scene of scenesNeedingAudio) {
+                const audioPath = path.join(
+                  projectAudioDir,
+                  `scene_${scene.order}.mp3`,
+                );
+
+                let result;
+                let lastError;
+                const maxRetries = 3;
+
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                  try {
+                    await this.logMessage(
+                      projectId,
+                      'INFO',
+                      'GENERATING_TTS',
+                      `Generating audio for scene ${scene.order}/${scenesNeedingAudio.length} (attempt ${attempt}/${maxRetries})...`,
+                    );
+
+                    if (scene.prosodyData) {
+                      try {
+                        const prosodySegments = JSON.parse(
+                          scene.prosodyData as string,
+                        );
+                        result =
+                          await this.ttsService.generateSpeechWithProsody(
+                            prosodySegments,
+                            project.speakerCode,
+                            audioPath,
+                          );
+                      } catch (parseError) {
+                        this.logger.warn(
+                          `Prosody parsing failed for scene ${scene.order}: ${parseError.message}`,
+                        );
+                        result = await this.ttsService.generateSpeech(
+                          scene.narration,
+                          project.speakerCode,
+                          audioPath,
+                          false,
+                        );
+                      }
+                    } else {
+                      result = await this.ttsService.generateSpeech(
+                        scene.narration,
+                        project.speakerCode,
+                        audioPath,
+                        false,
+                      );
+                    }
+                    break;
+                  } catch (error) {
+                    lastError = error;
+                    this.logger.error(
+                      `TTS generation failed for scene ${scene.order} (attempt ${attempt}/${maxRetries}): ${error.message}`,
+                    );
+                    if (attempt < maxRetries) {
+                      await new Promise((resolve) =>
+                        setTimeout(resolve, 2000 * attempt),
+                      );
+                    }
+                  }
+                }
+
+                if (!result) {
+                  throw new Error(
+                    `TTS generation failed for scene ${scene.order}: ${lastError?.message}`,
+                  );
+                }
+
+                results.push({
+                  sceneId: scene.id,
+                  audioPath,
+                  durationMs: result.durationMs,
+                  wordBoundaries: result.wordBoundaries || [],
+                });
+              }
+              return results;
+            },
+          );
+        })(),
+      ]);
+
+      // Update scene timing data from audio results
+      let currentTime = 0;
+      const orderedScenes = scenesForMedia.sort((a, b) => a.order - b.order);
+
+      for (const scene of orderedScenes) {
+        // Check if scene already has timing from previous run
+        if (scene.startTimeMs !== null && scene.endTimeMs !== null) {
+          currentTime = scene.endTimeMs;
           hasCompleteWordBoundaries = false;
           continue;
         }
-        const audioPath = path.join(
-          audioDir,
-          `${filePrefix}_scene_${scene.order}.mp3`,
-        );
 
-        let result;
-        let lastError;
-        const maxRetries = 3;
-
-        // Retry mechanism for TTS generation
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            await this.logMessage(
-              projectId,
-              'INFO',
-              'GENERATING_TTS',
-              `Generating audio for scene ${scene.order}/${scenesWithImages.length} (attempt ${attempt}/${maxRetries})...`,
-            );
-
-            // Check if prosody data exists
-            if (scene.prosodyData) {
-              try {
-                const prosodySegments = JSON.parse(scene.prosodyData as string);
-                // Use prosody-based speech generation
-                result = await this.ttsService.generateSpeechWithProsody(
-                  prosodySegments,
-                  project.speakerCode,
-                  audioPath,
-                );
-              } catch (parseError) {
-                this.logger.warn(
-                  `Prosody parsing failed for scene ${scene.order}: ${parseError.message}`,
-                );
-                // Fallback to regular speech if prosody parsing fails
-                result = await this.ttsService.generateSpeech(
-                  scene.narration,
-                  project.speakerCode,
-                  audioPath,
-                  false,
-                );
-              }
-            } else {
-              // Fallback to regular speech generation
-              result = await this.ttsService.generateSpeech(
-                scene.narration,
-                project.speakerCode,
-                audioPath,
-                false,
-              );
-            }
-
-            // Success - break retry loop
-            break;
-          } catch (error) {
-            lastError = error;
-            this.logger.error(
-              `TTS generation failed for scene ${scene.order} (attempt ${attempt}/${maxRetries}): ${error.message}`,
-            );
-
-            if (attempt < maxRetries) {
-              await this.logMessage(
-                projectId,
-                'WARN',
-                'GENERATING_TTS',
-                `TTS failed for scene ${scene.order}, retrying (${attempt}/${maxRetries})...`,
-              );
-              // Wait before retry (exponential backoff)
-              await new Promise((resolve) =>
-                setTimeout(resolve, 2000 * attempt),
-              );
-            }
-          }
-        }
-
-        // If all retries failed, throw error
-        if (!result) {
-          await this.logMessage(
-            projectId,
-            'ERROR',
-            'GENERATING_TTS',
-            `Failed to generate TTS for scene ${scene.order} after ${maxRetries} attempts: ${lastError?.message}`,
-          );
-          throw new Error(
-            `TTS generation failed for scene ${scene.order}: ${lastError?.message}`,
-          );
-        }
-
-        const sceneStartMs = currentTime;
-
-        await this.prisma.storyScene.update({
-          where: { id: scene.id },
-          data: {
-            audioPath,
-            startTimeMs: sceneStartMs,
-            endTimeMs: sceneStartMs + result.durationMs,
-          },
-        });
-
-        currentTime += result.durationMs;
-
-        if (result.wordBoundaries?.length) {
-          const sceneStartHns = Math.round(sceneStartMs * HNS_PER_MS);
-          result.wordBoundaries.forEach((boundary) => {
-            globalWordBoundaries.push({
-              text: boundary.text,
-              offset: boundary.offset + sceneStartHns,
-              duration: boundary.duration,
-            });
+        // Find audio result for this scene
+        const audioResult = audioResults.find((r) => r.sceneId === scene.id);
+        if (audioResult) {
+          const sceneStartMs = currentTime;
+          await this.prisma.storyScene.update({
+            where: { id: scene.id },
+            data: {
+              audioPath: audioResult.audioPath,
+              startTimeMs: sceneStartMs,
+              endTimeMs: sceneStartMs + audioResult.durationMs,
+            },
           });
-        } else {
-          hasCompleteWordBoundaries = false;
+
+          currentTime += audioResult.durationMs;
+
+          if (audioResult.wordBoundaries.length > 0) {
+            const sceneStartHns = Math.round(sceneStartMs * HNS_PER_MS);
+            audioResult.wordBoundaries.forEach((boundary) => {
+              globalWordBoundaries.push({
+                text: boundary.text,
+                offset: boundary.offset + sceneStartHns,
+                duration: boundary.duration,
+              });
+            });
+          } else {
+            hasCompleteWordBoundaries = false;
+          }
         }
       }
 
@@ -681,14 +760,21 @@ export class StoryService {
         data: { status: StoryStatus.RENDERING_VIDEO },
       });
 
-      const tmpDir = this.configService.get<string>(
+      const baseTmpDir = this.configService.get<string>(
         'VIDEO_TMP_DIR',
         './storage/tmp',
       );
-      const videoOutputDir = this.configService.get<string>(
+      const baseVideoOutputDir = this.configService.get<string>(
         'VIDEO_OUTPUT_DIR',
         './storage/videos',
       );
+
+      // Create project-specific temp directory
+      const projectTmpDir = path.join(baseTmpDir, filePrefix);
+      if (!fs.existsSync(projectTmpDir)) {
+        fs.mkdirSync(projectTmpDir, { recursive: true });
+      }
+
       const sceneVideos = [];
 
       const updatedScenes = await this.prisma.storyScene.findMany({
@@ -698,8 +784,8 @@ export class StoryService {
 
       for (const scene of updatedScenes) {
         const sceneVideoPath = path.join(
-          tmpDir,
-          `${filePrefix}_scene_${scene.order}.mp4`,
+          projectTmpDir,
+          `scene_${scene.order}.mp4`,
         );
 
         // Pass animation data to ffmpeg service
@@ -712,26 +798,43 @@ export class StoryService {
             animationShow: scene.animationShow,
             animationOut: scene.animationOut,
           },
+          width,
+          height,
         );
         sceneVideos.push(sceneVideoPath);
       }
 
-      const finalVideoPath = path.join(videoOutputDir, `${filePrefix}.mp4`);
+      // Create project-specific video output directory
+      const projectVideoOutputDir = path.join(baseVideoOutputDir, filePrefix);
+      if (!fs.existsSync(projectVideoOutputDir)) {
+        fs.mkdirSync(projectVideoOutputDir, { recursive: true });
+      }
+      const finalVideoPath = path.join(projectVideoOutputDir, `video.mp4`);
       await this.ffmpegService.concatenateVideos(sceneVideos, finalVideoPath);
 
-      // Cleanup temp files
+      // Cleanup temp files and directory
       for (const videoPath of sceneVideos) {
         if (fs.existsSync(videoPath)) {
           fs.unlinkSync(videoPath);
         }
       }
+      // Try to remove temp directory
+      try {
+        fs.rmSync(projectTmpDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
 
       // Step 8: Generate SRT
-      const srtOutputDir = this.configService.get<string>(
+      const baseSrtOutputDir = this.configService.get<string>(
         'SRT_OUTPUT_DIR',
         './storage/subtitles',
       );
-      const srtPath = path.join(srtOutputDir, `${filePrefix}.srt`);
+      const projectSrtDir = path.join(baseSrtOutputDir, filePrefix);
+      if (!fs.existsSync(projectSrtDir)) {
+        fs.mkdirSync(projectSrtDir, { recursive: true });
+      }
+      const srtPath = path.join(projectSrtDir, `subtitle.srt`);
 
       let srtContent: string;
       if (hasCompleteWordBoundaries && globalWordBoundaries.length > 0) {

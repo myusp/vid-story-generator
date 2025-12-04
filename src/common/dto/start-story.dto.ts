@@ -4,6 +4,7 @@ import {
   IsInt,
   IsEnum,
   Min,
+  Max,
   IsOptional,
   IsArray,
 } from 'class-validator';
@@ -35,6 +36,12 @@ export enum NarrativeTone {
   DRAMATIC = 'dramatic',
   INSPIRATIONAL = 'inspirational',
   MYSTERIOUS = 'mysterious',
+}
+
+// Content type for video generation
+export enum ContentType {
+  STORY = 'story', // Story with characters and narrative
+  EDUCATIONAL = 'educational', // Educational/explainer content with illustrations
 }
 
 // Animation types for video effects
@@ -176,6 +183,20 @@ export class StartStoryDto {
 
   @ApiProperty({
     description:
+      'Target duration per scene in seconds (for narrations mode - helps AI split scenes appropriately)',
+    example: 8,
+    minimum: 3,
+    maximum: 20,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(3)
+  @Max(20)
+  targetSceneDuration?: number;
+
+  @ApiProperty({
+    description:
       'Allowed animation types for video (if not specified, all animations are allowed)',
     example: ['pan-left', 'pan-right', 'zoom-slow', 'fade'],
     required: false,
@@ -187,4 +208,15 @@ export class StartStoryDto {
   @IsArray()
   @IsString({ each: true })
   allowedAnimations?: string[];
+
+  @ApiProperty({
+    description:
+      'Content type: story (with characters) or educational (illustrations/explanations)',
+    enum: ContentType,
+    example: ContentType.STORY,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ContentType)
+  contentType?: ContentType;
 }

@@ -1,5 +1,6 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Res, Header } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Response } from 'express';
 import { Public } from '../../common/guards/public.decorator';
 import { SpeakersService } from './speakers.service';
 
@@ -45,5 +46,36 @@ export class SpeakersController {
   })
   async getPopularSpeakers() {
     return this.speakersService.getPopularSpeakers();
+  }
+
+  @Get('preview')
+  @Public()
+  @Header('Content-Type', 'audio/mpeg')
+  @Header('Transfer-Encoding', 'chunked')
+  @ApiOperation({ summary: 'Stream TTS audio preview for a speaker' })
+  @ApiQuery({
+    name: 'speaker',
+    required: true,
+    description: 'Speaker short name (e.g., en-US-JennyNeural)',
+    example: 'en-US-JennyNeural',
+  })
+  @ApiQuery({
+    name: 'text',
+    required: false,
+    description: 'Text to synthesize (default: sample text)',
+    example: 'Hello! This is a voice preview.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns streaming audio data',
+  })
+  async previewSpeaker(
+    @Query('speaker') speaker: string,
+    @Query('text') text: string,
+    @Res() res: Response,
+  ) {
+    const previewText =
+      text || 'Hello! This is a voice preview for short story generation.';
+    await this.speakersService.streamPreview(speaker, previewText, res);
   }
 }

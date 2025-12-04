@@ -11,8 +11,12 @@ async function bootstrap() {
   // Serve static files from public directory
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
-  // Enable CORS
-  app.enableCors();
+  // Enable CORS with SSE support
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    exposedHeaders: ['Content-Type', 'Cache-Control'],
+  });
 
   // Global validation pipe
   app.useGlobalPipes(

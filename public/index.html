@@ -624,6 +624,13 @@ Scene 3: Third narration here..."></textarea>
                     <small style="color: #666;">Enter one narration per line. Each line becomes a scene.</small>
                 </div>
 
+                <!-- Target Scene Duration (for narrations mode) -->
+                <div class="form-group hidden" id="sceneDurationGroup">
+                    <label for="targetSceneDuration">Target Duration per Scene (seconds)</label>
+                    <input type="number" id="targetSceneDuration" min="3" max="20" value="8" placeholder="8">
+                    <small style="color: #666;">Recommended: 6-10 seconds. Helps AI split scenes appropriately.</small>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="genre">Genre *</label>
@@ -682,16 +689,26 @@ Scene 3: Third narration here..."></textarea>
 
                     <div class="form-group">
                         <label for="totalImages">Total Scenes *</label>
-                        <input type="number" id="totalImages" required value="8" min="3" max="20">
+                        <input type="number" id="totalImages" required value="8" min="1">
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="modelProvider">AI Model *</label>
-                    <select id="modelProvider" required>
-                        <option value="gemini">Gemini</option>
-                        <option value="openai">OpenAI</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="modelProvider">AI Model *</label>
+                        <select id="modelProvider" required>
+                            <option value="gemini">Gemini</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contentType">Content Type</label>
+                        <select id="contentType">
+                            <option value="story">Story (with characters)</option>
+                            <option value="educational">Educational (illustrations/explainer)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -718,6 +735,13 @@ Scene 3: Third narration here..."></textarea>
                         <div class="speaker-tabs">
                             <button type="button" class="speaker-tab active" onclick="switchSpeakerTab('all')">All Voices</button>
                             <button type="button" class="speaker-tab" onclick="switchSpeakerTab('favorites')">⭐ Favorites</button>
+                        </div>
+
+                        <div style="padding: 10px; background: #e3f2fd; border-bottom: 1px solid #e0e0e0;">
+                            <label class="checkbox-label" title="Connects directly to Microsoft Edge TTS servers from your browser">
+                                <input type="checkbox" id="useClientSideTTS"> 
+                                Use Client-Side Direct Streaming (Experimental)
+                            </label>
                         </div>
 
                         <div id="speakerList" class="speaker-list">
@@ -1000,31 +1024,268 @@ Scene 3: Third narration here..."></textarea>
             localStorage.setItem('speakerFavorites', JSON.stringify(favorites));
         }
 
-        // Play voice preview (uses browser's speech synthesis as fallback)
+        // Edge TTS Client for direct browser streaming
+        class EdgeTTSClient {
+            constructor() {
+                this.ws = null;
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.audioQueue = [];
+                this.isPlaying = false;
+                this.nextStartTime = 0;
+            }
+
+            async play(text, voice, onStart, onEnd, onError) {
+                if (this.ws) {
+                    this.ws.close();
+                }
+
+                // Resume audio context if suspended (browser policy)
+                if (this.audioContext.state === 'suspended') {
+                    await this.audioContext.resume();
+                }
+
+                const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+                const url = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}`;
+                
+                this.ws = new WebSocket(url);
+                this.nextStartTime = this.audioContext.currentTime;
+                
+                const requestId = this.generateRequestId();
+                const timestamp = new Date().toString();
+
+                this.ws.onopen = () => {
+                    const config = {
+                        context: {
+                            synthesis: {
+                                audio: {
+                                    metadataoptions: {
+                                        sentenceBoundaryEnabled: "false",
+                                        wordBoundaryEnabled: "false"
+                                    },
+                                    outputFormat: "audio-24khz-48kbitrate-mono-mp3"
+                                }
+                            }
+                        }
+                    };
+                    
+                    this.ws.send(`X-Timestamp:${timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n${JSON.stringify(config)}`);
+
+                    const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%'>${text}</prosody></voice></speak>`;
+                    this.ws.send(`X-RequestId:${requestId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${timestamp}\r\nPath:ssml\r\n\r\n${ssml}`);
+                };
+
+                this.ws.onmessage = async (event) => {
+                    if (typeof event.data === 'string') {
+                        if (event.data.includes('Path:turn.end')) {
+                            this.ws.close();
+                            if (onEnd) setTimeout(onEnd, 1000); // Give time for audio to finish
+                        }
+                    } else if (event.data instanceof Blob) {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        const textHeaderEnd = this.findHeaderEnd(arrayBuffer);
+                        
+                        if (textHeaderEnd > 0) {
+                            const audioData = arrayBuffer.slice(textHeaderEnd);
+                            if (audioData.byteLength > 0) {
+                                try {
+                                    // Decode audio data
+                                    const audioBuffer = await this.audioContext.decodeAudioData(audioData);
+                                    this.playBuffer(audioBuffer);
+                                    if (!this.isPlaying) {
+                                        this.isPlaying = true;
+                                        if (onStart) onStart();
+                                    }
+                                } catch (e) {
+                                    console.warn("Decode error (partial frame?):", e);
+                                }
+                            }
+                        }
+                    }
+                };
+
+                this.ws.onerror = (e) => {
+                    if (onError) onError(e);
+                };
+            }
+
+            playBuffer(buffer) {
+                const source = this.audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.audioContext.destination);
+                
+                // Schedule playback
+                const start = Math.max(this.nextStartTime, this.audioContext.currentTime);
+                source.start(start);
+                this.nextStartTime = start + buffer.duration;
+            }
+
+            findHeaderEnd(arrayBuffer) {
+                const view = new Uint8Array(arrayBuffer);
+                for (let i = 0; i < view.length - 3; i++) {
+                    if (view[i] === 13 && view[i+1] === 10 && view[i+2] === 13 && view[i+3] === 10) {
+                        return i + 4;
+                    }
+                }
+                return 0;
+            }
+
+            generateRequestId() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            stop() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                this.isPlaying = false;
+            }
+        }
+
+        const ttsClient = new EdgeTTSClient();
+
+        async function playVoiceClientSide(shortName, btn) {
+            if (currentPlayingBtn === btn) {
+                ttsClient.stop();
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+                return;
+            }
+
+            if (currentPlayingBtn) {
+                // Stop other playing
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
+                ttsClient.stop();
+                currentPlayingBtn.textContent = '▶';
+                currentPlayingBtn.classList.remove('playing');
+            }
+
+            btn.textContent = '⏳';
+            btn.classList.add('playing');
+            currentPlayingBtn = btn;
+
+            try {
+                await ttsClient.play(
+                    "Hello! This is a direct client-side stream.",
+                    shortName,
+                    () => { // onStart
+                        btn.textContent = '⏹';
+                    },
+                    () => { // onEnd
+                        btn.textContent = '▶';
+                        btn.classList.remove('playing');
+                        currentPlayingBtn = null;
+                    },
+                    (err) => { // onError
+                        console.error("Client TTS error:", err);
+                        btn.textContent = '▶';
+                        btn.classList.remove('playing');
+                        currentPlayingBtn = null;
+                        alert("Client-side streaming failed. Try unchecking the box.");
+                    }
+                );
+            } catch (e) {
+                console.error(e);
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+            }
+        }
+
+        // Play voice preview using streaming TTS API
         async function playVoice(shortName, btn) {
+            // Check if client-side streaming is enabled
+            const useClientSide = document.getElementById('useClientSideTTS') && document.getElementById('useClientSideTTS').checked;
+            
+            if (useClientSide) {
+                playVoiceClientSide(shortName, btn);
+                return;
+            }
+
             // Stop any currently playing audio
             if (currentAudio) {
                 currentAudio.pause();
+                currentAudio.currentTime = 0;
                 currentAudio = null;
                 if (currentPlayingBtn) {
                     currentPlayingBtn.textContent = '▶';
                     currentPlayingBtn.classList.remove('playing');
                 }
             }
+            
+            // Stop client TTS if playing
+            ttsClient.stop();
 
             if (currentPlayingBtn === btn) {
                 currentPlayingBtn = null;
                 return;
             }
 
-            btn.textContent = '⏹';
+            btn.textContent = '⏳';
             btn.classList.add('playing');
             currentPlayingBtn = btn;
 
             try {
-                // For now, use browser's speech synthesis as a preview
-                // In production, you could call an API endpoint to generate a sample
-                const utterance = new SpeechSynthesisUtterance('Hello! This is a voice preview for short story generation.');
+                // Use the streaming TTS preview API endpoint
+                const previewUrl = `${API_URL}/speakers/preview?speaker=${encodeURIComponent(shortName)}`;
+                
+                // Create audio element and stream the preview
+                const audio = new Audio(previewUrl);
+                currentAudio = audio;
+                
+                audio.oncanplaythrough = () => {
+                    btn.textContent = '⏹';
+                    audio.play();
+                };
+                
+                audio.onended = () => {
+                    btn.textContent = '▶';
+                    btn.classList.remove('playing');
+                    currentPlayingBtn = null;
+                    currentAudio = null;
+                };
+                
+                audio.onerror = (e) => {
+                    console.error('Audio streaming error:', e);
+                    btn.textContent = '▶';
+                    btn.classList.remove('playing');
+                    currentPlayingBtn = null;
+                    currentAudio = null;
+                    // Fallback to browser speech synthesis
+                    fallbackToSpeechSynthesis(shortName, btn);
+                };
+                
+                // Start loading the audio
+                audio.load();
+            } catch (error) {
+                btn.textContent = '▶';
+                btn.classList.remove('playing');
+                currentPlayingBtn = null;
+                console.error('Voice preview failed:', error);
+                // Fallback to browser speech synthesis
+                fallbackToSpeechSynthesis(shortName, btn);
+            }
+        }
+
+        // Fallback to browser's speech synthesis if TTS API fails
+        function fallbackToSpeechSynthesis(shortName, btn) {
+            try {
+                btn.textContent = '⏹';
+                btn.classList.add('playing');
+                currentPlayingBtn = btn;
+                
+                const utterance = new SpeechSynthesisUtterance('Hello! This is a voice preview.');
                 utterance.lang = shortName.split('-').slice(0, 2).join('-');
                 utterance.onend = () => {
                     btn.textContent = '▶';
@@ -1036,7 +1297,7 @@ Scene 3: Third narration here..."></textarea>
                 btn.textContent = '▶';
                 btn.classList.remove('playing');
                 currentPlayingBtn = null;
-                console.error('Voice preview failed:', error);
+                console.error('Fallback speech synthesis failed:', error);
             }
         }
 
@@ -1060,6 +1321,7 @@ Scene 3: Third narration here..."></textarea>
                 modelProvider: document.getElementById('modelProvider').value,
                 imageStyle: document.getElementById("imageStyle").value || null,
                 narrativeTone: document.getElementById("narrativeTone").value || null,
+                contentType: document.getElementById("contentType").value || 'story',
             };
 
             // Handle different story modes
@@ -1084,13 +1346,19 @@ Scene 3: Third narration here..."></textarea>
             } else if (storyMode === 'narrations') {
                 const narrationsText = document.getElementById('existingNarrations').value;
                 const narrations = narrationsText.split('\n').filter(line => line.trim());
-                if (narrations.length < 2) {
-                    showMessage('Please enter at least 2 narrations (one per line)', 'error');
+                if (narrations.length === 0) {
+                    showMessage('Please enter at least one narration line', 'error');
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Create Story';
                     return;
                 }
                 data.existingNarrations = narrations;
+                
+                // Add target scene duration if specified
+                const sceneDuration = parseInt(document.getElementById('targetSceneDuration').value);
+                if (sceneDuration && sceneDuration >= 3 && sceneDuration <= 20) {
+                    data.targetSceneDuration = sceneDuration;
+                }
             }
 
             // Get allowed animations if any are selected
@@ -1120,21 +1388,22 @@ Scene 3: Third narration here..."></textarea>
                 
                 const project = await response.json();
                 
-                // Trigger generation
-                await fetch(`${API_URL}/stories/${project.id}/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'X-API-KEY': API_KEY
-                    }
-                });
-
-                showMessage('Story project created! Generation started.', 'success');
+                // Generation is now triggered automatically by the /start endpoint
+                // No need for separate /generate call
+                
+                showMessage('Story project created! Generation started automatically.', 'success');
                 document.getElementById('storyForm').reset();
                 document.getElementById('selectedSpeaker').value = '';
                 updateStoryModeUI(); // Reset UI
                 
-                // Switch to projects tab
+                // Switch to projects tab and subscribe to SSE
                 switchTab('projects');
+                loadProjects();
+                
+                // Subscribe to SSE for real-time updates
+                if (project.id) {
+                    subscribeToProjectLogs(project.id);
+                }
             } catch (error) {
                 showMessage('Failed to create story: ' + error.message, 'error');
             } finally {
@@ -1451,12 +1720,14 @@ Scene 3: Third narration here..."></textarea>
             const topicGroup = document.getElementById('topicGroup');
             const storyPromptGroup = document.getElementById('storyPromptGroup');
             const narrationsGroup = document.getElementById('narrationsGroup');
+            const sceneDurationGroup = document.getElementById('sceneDurationGroup');
             const totalImagesGroup = document.getElementById('totalImages').parentElement;
 
             // Hide all
             topicGroup.classList.add('hidden');
             storyPromptGroup.classList.add('hidden');
             narrationsGroup.classList.add('hidden');
+            sceneDurationGroup.classList.add('hidden');
 
             // Show based on mode
             if (mode === 'topic') {
@@ -1467,6 +1738,7 @@ Scene 3: Third narration here..."></textarea>
                 totalImagesGroup.style.display = 'block';
             } else if (mode === 'narrations') {
                 narrationsGroup.classList.remove('hidden');
+                sceneDurationGroup.classList.remove('hidden');
                 totalImagesGroup.style.display = 'none'; // Auto-calculated from narrations
             }
         }

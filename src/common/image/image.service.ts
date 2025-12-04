@@ -19,23 +19,25 @@ export class ImageService {
 
     // Create axios instance with retry configuration
     this.axiosInstance = axios.create({
-      timeout: 60000,
+      timeout: 1000 * 60 * 2,
     });
 
     // Configure axios-retry with exponential backoff
     axiosRetry(this.axiosInstance, {
       retries: 5, // Retry up to 5 times
-      retryDelay: (r, e) => axiosRetry.exponentialDelay(r, e, 3),
+      shouldResetTimeout: true, // Reset timeout for each retry
+      retryDelay: (r, e) => axiosRetry.exponentialDelay(r, e, 3000),
       retryCondition: (error) => {
-        // Retry on network errors or 5xx status codes (including 502)
+        // Retry on network errors, timeouts, or 5xx status codes
         return (
           axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+          error.code === 'ECONNABORTED' ||
           (error.response?.status >= 500 && error.response?.status <= 599)
         );
       },
       onRetry: (retryCount, error) => {
         this.logger.warn(
-          `Retry attempt ${retryCount} for image generation. Error: ${error.message}`,
+          `Retry attempt ${retryCount} for image generation. Error: ${error.message} (Code: ${error.code})`,
         );
       },
     });
@@ -50,7 +52,7 @@ export class ImageService {
     try {
       // Polinations AI URL format
       const encodedPrompt = encodeURIComponent(prompt);
-      const imageUrl = `${this.baseUrl}/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&model=flux`;
+      const imageUrl = `${this.baseUrl}/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&model=flux&enhance=true`;
 
       this.logger.log(
         `Generating image for prompt: ${prompt.substring(0, 50)}...`,
