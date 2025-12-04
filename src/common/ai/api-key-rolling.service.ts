@@ -17,7 +17,10 @@ export class ApiKeyRollingService {
   private initializeKeys() {
     const geminiKeysStr = this.configService.get<string>('GEMINI_API_KEYS', '');
     const openaiKeysStr = this.configService.get<string>('OPENAI_API_KEYS', '');
-    const geminiTtsKeysStr = this.configService.get<string>('GEMINI_TTS_API_KEYS', '');
+    const geminiTtsKeysStr = this.configService.get<string>(
+      'GEMINI_TTS_API_KEYS',
+      '',
+    );
 
     this.geminiKeys = geminiKeysStr
       .split(',')

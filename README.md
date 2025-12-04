@@ -5,7 +5,7 @@ Backend API for generating AI-powered short video stories with Azure TTS and Pol
 ## Features
 
 - 🤖 AI-powered story generation (Gemini/OpenAI with round-robin API key rotation)
-- 🎙️ Azure TTS voice-over with word-level timestamps
+- 🎙️ Text-to-Speech with **Edge TTS** (free) or **Gemini TTS** (premium quality)
 - 🖼️ Polinations AI image generation with automatic retry
 - 🎬 FFmpeg video rendering pipeline
 - 📝 SRT subtitle generation
@@ -21,7 +21,8 @@ Backend API for generating AI-powered short video stories with Azure TTS and Pol
 - **Prisma** - Database ORM
 - **SQLite** - Database
 - **Swagger** - API documentation
-- **Azure Cognitive Services** - Text-to-Speech
+- **Edge TTS** - Free Text-to-Speech (Microsoft)
+- **Gemini TTS** - Premium Text-to-Speech (Google)
 - **Polinations AI** - Image generation
 - **FFmpeg** - Video rendering
 - **Google Gemini / OpenAI** - Story generation
@@ -31,8 +32,8 @@ Backend API for generating AI-powered short video stories with Azure TTS and Pol
 
 - Node.js 20+
 - FFmpeg installed on the system
-- Azure Speech Services API key
-- Gemini or OpenAI API keys
+- **Optional**: Gemini API key for Gemini TTS (premium voices)
+- Gemini or OpenAI API keys for story generation
 
 ## Installation
 
@@ -58,6 +59,15 @@ npm run build
 ## Environment Variables
 
 See `.env.example` for all required environment variables.
+
+### TTS Providers
+
+The application supports two TTS providers:
+
+1. **Edge TTS** (default, free) - No API key required, 100+ voices in multiple languages
+2. **Gemini TTS** (premium) - Requires Gemini API key, 30 natural-sounding multilingual voices
+
+For detailed information about Gemini TTS setup and usage, see [docs/GEMINI_TTS.md](docs/GEMINI_TTS.md).
 
 ## Running the Application
 
@@ -87,7 +97,11 @@ Swagger documentation at `http://localhost:3000/api`
 
 ### Speakers
 
-- `GET /speakers` - List available Azure TTS speakers
+- `GET /speakers` - List available Edge TTS speakers
+- `GET /speakers/gemini` - List available Gemini TTS speakers
+- `GET /speakers/locale?locale=en-US` - Filter speakers by locale
+- `GET /speakers/popular` - Get popular/commonly used speakers
+- `GET /speakers/preview?speaker=<name>&text=<text>` - Preview speaker voice
 
 ## Project Structure
 
@@ -100,7 +114,7 @@ src/
 │   └── speakers/       # TTS speaker info
 ├── common/
 │   ├── ai/             # AI service (Gemini/OpenAI)
-│   ├── tts/            # Azure TTS service
+│   ├── tts/            # TTS services (Edge TTS & Gemini TTS)
 │   ├── image/          # Polinations AI service
 │   ├── ffmpeg/         # Video rendering
 │   ├── prisma/         # Database service

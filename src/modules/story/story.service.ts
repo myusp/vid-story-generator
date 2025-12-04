@@ -644,8 +644,9 @@ export class StoryService {
                       `Generating audio for scene ${scene.order}/${scenesNeedingAudio.length} (attempt ${attempt}/${maxRetries}) using ${project.ttsProvider || 'edge-tts'}...`,
                     );
 
-                    const ttsProvider = (project.ttsProvider ||
-                      'edge-tts') as 'edge-tts' | 'gemini-tts';
+                    const ttsProvider = (project.ttsProvider || 'edge-tts') as
+                      | 'edge-tts'
+                      | 'gemini-tts';
 
                     if (scene.prosodyData) {
                       try {

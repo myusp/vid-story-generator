@@ -141,7 +141,6 @@ export class GeminiTtsService {
         contents,
       });
 
-      let fileIndex = 0;
       const audioChunks: Buffer[] = [];
 
       // Process stream chunks
@@ -169,7 +168,6 @@ export class GeminiTtsService {
           }
 
           audioChunks.push(buffer);
-          fileIndex++;
         }
       }
 
@@ -233,7 +231,8 @@ export class GeminiTtsService {
    */
   private parseMimeType(mimeType: string): WavConversionOptions {
     const [fileType, ...params] = mimeType.split(';').map((s) => s.trim());
-    const [_, format] = fileType.split('/');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_mimePrefix, format] = fileType.split('/');
 
     const options: Partial<WavConversionOptions> = {
       numChannels: 1,
