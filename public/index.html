@@ -661,17 +661,41 @@ Scene 3: Third narration here..."></textarea>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="imageStyle">Image Style</label>
+                        <label for="imageStyle">Image Style
+                            <span style="font-size: 12px; color: #666; font-weight: normal;">- Visual art style for images</span>
+                        </label>
                         <select id="imageStyle">
-                            <option value="">Default</option>
-                            <option value="realistic">Realistic</option>
-                            <option value="cartoon">Cartoon</option>
-                            <option value="animation_90s">Animation 90s</option>
-                            <option value="ghibli">Ghibli</option>
-                            <option value="anime">Anime</option>
-                            <option value="pixar">Pixar</option>
-                            <option value="watercolor">Watercolor</option>
+                            <option value="">Default - AI decides best style</option>
+                            <optgroup label="Realistic Styles">
+                                <option value="hyper-realistic">Hyper-Realistic - Photographic quality</option>
+                                <option value="realistic">Realistic - Natural looking</option>
+                                <option value="cinematic">Cinematic - Movie-like with dramatic lighting</option>
+                                <option value="portrait">Portrait - Detailed face focus</option>
+                            </optgroup>
+                            <optgroup label="Artistic Styles">
+                                <option value="oil-painting">Oil Painting - Classic art style</option>
+                                <option value="watercolor">Watercolor - Soft, flowing colors</option>
+                                <option value="digital-art">Digital Art - Modern digital painting</option>
+                                <option value="concept-art">Concept Art - Game/film style</option>
+                                <option value="impressionist">Impressionist - Monet-style</option>
+                            </optgroup>
+                            <optgroup label="Animation Styles">
+                                <option value="anime">Anime - Japanese animation style</option>
+                                <option value="ghibli">Studio Ghibli - Miyazaki style</option>
+                                <option value="pixar">Pixar/3D - Computer animated</option>
+                                <option value="cartoon">Cartoon - Classic cartoon style</option>
+                                <option value="animation_90s">90s Animation - Nostalgic style</option>
+                                <option value="disney">Disney - Classic Disney style</option>
+                            </optgroup>
+                            <optgroup label="Specialty Styles">
+                                <option value="fantasy">Fantasy - Magical, otherworldly</option>
+                                <option value="sci-fi">Sci-Fi - Futuristic, technological</option>
+                                <option value="minimalist">Minimalist - Simple, clean lines</option>
+                                <option value="vintage">Vintage - Retro, aged look</option>
+                                <option value="noir">Film Noir - Black & white, dramatic shadows</option>
+                            </optgroup>
                         </select>
+                        <small style="color: #888; display: block; margin-top: 4px;">💡 Tip: Style affects the visual mood. Choose based on your story's tone.</small>
                     </div>
 
                     <div class="form-group">

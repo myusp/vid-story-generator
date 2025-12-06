@@ -1,8 +1,23 @@
-import { Controller, Get, Query, Res, Header } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
+  Res,
+  Header,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { Public } from '../../common/guards/public.decorator';
 import { SpeakersService } from './speakers.service';
+import { GenerateTtsDto } from './dto/generate-tts.dto';
 
 @ApiTags('speakers')
 @Controller('speakers')
@@ -99,5 +114,23 @@ export class SpeakersController {
     const previewText =
       text || 'Hello! This is a voice preview for short story generation.';
     await this.speakersService.streamPreview(speaker, previewText, res);
+  }
+
+  @Post('generate')
+  @Public()
+  @Header('Content-Type', 'audio/mpeg')
+  @Header('Content-Disposition', 'attachment; filename="generated-tts.mp3"')
+  @ApiOperation({
+    summary: 'Generate TTS audio with custom parameters and download',
+    description:
+      'Generate text-to-speech audio with provider-specific options. Edge TTS supports pitch/rate/volume, Gemini TTS supports style instructions.',
+  })
+  @ApiBody({ type: GenerateTtsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns generated audio file for download',
+  })
+  async generateTts(@Body() dto: GenerateTtsDto, @Res() res: Response) {
+    await this.speakersService.generateAndDownloadTts(dto, res);
   }
 }

@@ -4,6 +4,11 @@ import { EdgeTTS } from 'edge-tts-universal';
 import { TtsService } from '../../common/tts/tts.service';
 import { GeminiTtsService } from '../../common/tts/gemini-tts.service';
 import { PollinationsTtsService } from '../../common/tts/pollinations-tts.service';
+import { TtsCoordinatorService } from '../../common/tts/tts-coordinator.service';
+import { GenerateTtsDto, TtsProviderType } from './dto/generate-tts.dto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 
 @Injectable()
 export class SpeakersService {
@@ -13,6 +18,7 @@ export class SpeakersService {
     private ttsService: TtsService,
     private geminiTtsService: GeminiTtsService,
     private pollinationsTtsService: PollinationsTtsService,
+    private ttsCoordinator: TtsCoordinatorService,
   ) {}
 
   async listAvailableSpeakers() {
@@ -153,6 +159,94 @@ export class SpeakersService {
     } catch (error) {
       this.logger.error(`TTS preview failed: ${error.message}`);
       res.status(500).json({ error: 'Failed to generate TTS preview' });
+    }
+  }
+
+  /**
+   * Generate TTS with custom parameters and stream for download
+   */
+  async generateAndDownloadTts(
+    dto: GenerateTtsDto,
+    res: Response,
+  ): Promise<void> {
+    const tmpDir = os.tmpdir();
+    const timestamp = Date.now();
+    const outputPath = path.join(tmpDir, `tts-${timestamp}.mp3`);
+
+    try {
+      this.logger.log(
+        `Generating TTS: provider=${dto.provider}, voice=${dto.voice}, text length=${dto.text.length}`,
+      );
+
+      if (dto.provider === TtsProviderType.EDGE_TTS) {
+        // Edge TTS with pitch/rate/volume controls
+        const tts = new EdgeTTS(dto.text, dto.voice, {
+          rate: dto.rate || '+0%',
+          pitch: dto.pitch || '+0Hz',
+          volume: dto.volume || '+0%',
+        });
+
+        const result = await tts.synthesize();
+        const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
+        await fs.writeFile(outputPath, audioBuffer);
+      } else if (dto.provider === TtsProviderType.GEMINI_TTS) {
+        // Gemini TTS with style instruction
+        if (dto.style) {
+          await this.ttsCoordinator.generateSpeechWithStyle(
+            dto.text,
+            dto.style,
+            dto.voice,
+            outputPath,
+            'gemini-tts',
+          );
+        } else {
+          await this.ttsCoordinator.generateSpeech(
+            dto.text,
+            dto.voice,
+            outputPath,
+            'gemini-tts',
+            false,
+          );
+        }
+      } else if (dto.provider === TtsProviderType.POLLINATIONS_TTS) {
+        // Pollinations TTS
+        await this.ttsCoordinator.generateSpeech(
+          dto.text,
+          dto.voice,
+          outputPath,
+          'pollinations-tts',
+          false,
+        );
+      } else {
+        throw new Error(`Unsupported TTS provider: ${dto.provider}`);
+      }
+
+      // Read the generated file
+      const audioBuffer = await fs.readFile(outputPath);
+
+      // Set response headers
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', audioBuffer.length);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="tts-${dto.voice}-${timestamp}.mp3"`,
+      );
+
+      // Send audio data
+      res.end(audioBuffer);
+
+      // Cleanup temp file
+      await fs.unlink(outputPath).catch(() => {
+        // Ignore cleanup errors
+      });
+    } catch (error) {
+      this.logger.error(`TTS generation failed: ${error.message}`);
+      res.status(500).json({ error: 'Failed to generate TTS audio' });
+
+      // Cleanup on error
+      await fs.unlink(outputPath).catch(() => {
+        // Ignore cleanup errors
+      });
     }
   }
 }

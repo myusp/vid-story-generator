@@ -647,21 +647,32 @@ Generate exactly ${narrations.length} results, one for each scene.`;
 The prompt should be in English and describe:
 - Main subject/characters (use the character descriptions above if they appear in this scene)
 - Setting/environment (maintain consistency with previous scene if continuing the same location)
-- Mood/atmosphere
-- Visual details
-- Composition
+- Mood/atmosphere with specific lighting details (golden hour, soft shadows, dramatic lighting, etc.)
+- Visual details including colors, textures, materials
+- Composition (camera angle, perspective, depth of field)
+- Artistic elements (bokeh, lens flare, color grading, etc.)
 
-IMPORTANT RULES FOR VARIETY:
-1. **AVOID PORTRAIT-STYLE IMAGES.** Do NOT focus solely on the character's face unless necessary for emotion.
-2. **VARY THE FOCUS:** Focus on the **EVENT**, **ACTIVITY**, or **SETTING** described in the narration.
-3. **USE DYNAMIC ANGLES:** Use wide shots, over-the-shoulder, or point-of-view shots to show the scene context.
-4. Characters should be DOING something related to the narration, not just standing/posing.
-5. Maintain visual continuity with the previous scene if applicable.
-6. DO NOT include any text, labels, words, letters, or numbers in the image.`;
+ENHANCED PROMPT STRUCTURE (use this format):
+"[Main Subject/Action] in [Setting/Environment], [Camera Angle/Composition], [Lighting Description], [Mood/Atmosphere], [Additional Visual Details including colors, textures, effects]"
+
+EXAMPLE OF HIGH-QUALITY PROMPT:
+"A stunningly beautiful young woman with sharp facial features and flowing multidimensional hair cascading down her back in soft waves, wearing elegant summer top and jeans with minimal classic jewelry, gazing gracefully at camera with gentle smile and wide piercing eyes, cradling a big bouquet of vibrant roses with shimmering silk petals embellished with delicate gems, standing near a giant floral-vine tree with cascading flowers, hyper-realistic image with slight anime theme, vibrant colorful portrait, full body view, soft natural lighting with dappled sunlight, shallow depth of field, professional photography"
+
+IMPORTANT RULES FOR VARIETY AND QUALITY:
+1. AVOID PORTRAIT-STYLE IMAGES. Do NOT focus solely on character face unless emotion is central to the scene.
+2. VARY THE FOCUS: Focus on the EVENT, ACTIVITY, or SETTING described in the narration.
+3. USE DYNAMIC ANGLES: Use wide shots, over-the-shoulder, bird eye view, low angle, or point-of-view shots.
+4. BE SPECIFIC WITH DETAILS: Include specific colors, textures, materials (silk, leather, wood, metal, glass)
+5. ADD LIGHTING DETAILS: Mention lighting quality (soft morning light, golden hour, studio lighting, rim light, etc.)
+6. INCLUDE ATMOSPHERIC ELEMENTS: Weather, time of day, season, particles in air (dust motes, rain, snow)
+7. Characters should be DOING something related to the narration, not just standing or posing.
+8. Maintain visual continuity with the previous scene if applicable.
+9. DO NOT include any text, labels, words, letters, or numbers in the image.
+10. Use artistic photography terms when applicable (bokeh, depth of field, rule of thirds, leading lines)`;
 
     const educationalPromptContent = `
 The prompt should be in English and describe a UNIQUE EDUCATIONAL ILLUSTRATION:
-- A specific visual representation of THIS scene's narration content
+- A specific visual representation of THIS scene narration content
 - Visual metaphors or representations of abstract concepts
 - Clean, clear composition focused on the educational message
 - Objects, abstract shapes, nature elements, or technology items
@@ -672,7 +683,7 @@ IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
 3. Use visual metaphors and symbolic representations to explain concepts.
 4. Make this scene visually DIFFERENT from previous scenes - use varied subjects.
 5. The illustration should be self-explanatory and support the narration text.
-6. Focus on unique objects or metaphors that haven't been used in previous scenes.`;
+6. Focus on unique objects or metaphors that have not been used in previous scenes.`;
 
     const prompt = `Based on this narration: "${narration}"
 ${characterContext}${previousContext}
