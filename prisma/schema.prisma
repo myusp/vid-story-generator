@@ -17,6 +17,7 @@ model StoryProject {
   genre            String
   language         String
   speakerCode      String
+  ttsProvider      String?     @default("edge-tts") // 'edge-tts' or 'gemini-tts'
   orientation      String
   totalImages      Int
   modelProvider    String      @default("gemini")

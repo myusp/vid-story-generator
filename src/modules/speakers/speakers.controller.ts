@@ -20,6 +20,28 @@ export class SpeakersController {
     return this.speakersService.listAvailableSpeakers();
   }
 
+  @Get('gemini')
+  @Public()
+  @ApiOperation({ summary: 'List available Gemini TTS speakers' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns list of available Gemini TTS speakers',
+  })
+  async listGeminiSpeakers() {
+    return this.speakersService.listGeminiSpeakers();
+  }
+
+  @Get('pollinations')
+  @Public()
+  @ApiOperation({ summary: 'List available Pollinations TTS speakers' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns list of available Pollinations TTS speakers',
+  })
+  async listPollinationsSpeakers() {
+    return this.speakersService.listPollinationsSpeakers();
+  }
+
   @Get('locale')
   @Public()
   @ApiOperation({ summary: 'Get speakers by locale' })

@@ -2,12 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { EdgeTTS } from 'edge-tts-universal';
 import { TtsService } from '../../common/tts/tts.service';
+import { GeminiTtsService } from '../../common/tts/gemini-tts.service';
+import { PollinationsTtsService } from '../../common/tts/pollinations-tts.service';
 
 @Injectable()
 export class SpeakersService {
   private readonly logger = new Logger(SpeakersService.name);
 
-  constructor(private ttsService: TtsService) {}
+  constructor(
+    private ttsService: TtsService,
+    private geminiTtsService: GeminiTtsService,
+    private pollinationsTtsService: PollinationsTtsService,
+  ) {}
 
   async listAvailableSpeakers() {
     try {
@@ -20,8 +26,55 @@ export class SpeakersService {
         displayName: voice.displayName || voice.name,
         locale: voice.locale,
         gender: voice.gender,
+        provider: 'edge-tts',
       }));
     } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * List Gemini TTS speakers
+   */
+  async listGeminiSpeakers() {
+    try {
+      const voices = this.geminiTtsService.listVoices();
+
+      return voices.map((voice) => ({
+        name: `${voice.name}-${voice.gender}`,
+        shortName: voice.name,
+        displayName: voice.name,
+        locale: 'multi', // Gemini TTS voices are multilingual
+        gender: voice.gender,
+        provider: 'gemini-tts',
+        sampleUrl: voice.sampleUrl || '',
+      }));
+    } catch (error) {
+      this.logger.error(`Failed to list Gemini TTS voices: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * List Pollinations TTS speakers
+   */
+  async listPollinationsSpeakers() {
+    try {
+      const voices = this.pollinationsTtsService.listVoices();
+
+      return voices.map((voice) => ({
+        name: voice.name,
+        shortName: voice.name,
+        displayName: `${voice.name.charAt(0).toUpperCase() + voice.name.slice(1)} - ${voice.description}`,
+        locale: 'en-US', // Pollinations TTS is optimized for English but works with other languages
+        gender: 'Neutral', // Pollinations doesn't specify gender
+        provider: 'pollinations-tts',
+        description: voice.description,
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Failed to list Pollinations TTS voices: ${error.message}`,
+      );
       return [];
     }
   }
