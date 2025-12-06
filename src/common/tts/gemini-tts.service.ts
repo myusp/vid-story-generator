@@ -222,7 +222,24 @@ export class GeminiTtsService {
     timestamps: WordTimestamp[];
     wordBoundaries: SubtitleWordBoundary[];
   }> {
-    this.logger.log(`Starting Gemini TTS generation for ${outputPath}`);
+    this.logger.log(
+      `Starting Gemini TTS generation for ${outputPath} with voice: ${voiceName}`,
+    );
+
+    // Validate voice name
+    const validVoice = this.geminiVoices.find(
+      (v) => v.name.toLowerCase() === voiceName.toLowerCase(),
+    );
+    if (!validVoice) {
+      this.logger.warn(
+        `Voice "${voiceName}" not found in valid voices list. Using first available voice.`,
+      );
+      voiceName = this.geminiVoices[0].name;
+    } else {
+      // Ensure exact case match
+      voiceName = validVoice.name;
+      this.logger.log(`Validated voice name: ${voiceName}`);
+    }
 
     // Retry logic for transient errors
     const maxRetries = 3;

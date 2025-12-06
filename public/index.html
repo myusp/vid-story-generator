@@ -595,33 +595,43 @@
             <form id="storyForm" onsubmit="createStory(event)">
                 <!-- Story Mode Selection -->
                 <div class="form-group">
-                    <label for="storyMode">Story Creation Mode</label>
+                    <label for="storyMode">Story Creation Mode 
+                        <span style="font-size: 12px; color: #666; font-weight: normal;">- Choose how you want to create your story</span>
+                    </label>
                     <select id="storyMode" onchange="updateStoryModeUI()">
-                        <option value="topic">Generate from Topic</option>
-                        <option value="prompt">Generate from Story Prompt</option>
-                        <option value="narrations">Use Existing Narrations</option>
+                        <option value="topic">Generate from Topic - AI creates full story from a simple topic</option>
+                        <option value="prompt">Generate from Story Prompt - Provide a story outline, AI generates narrations</option>
+                        <option value="narrations">Use Existing Narrations - You write the narrations manually</option>
                     </select>
                 </div>
 
                 <!-- Topic Input (for topic mode) -->
                 <div class="form-group" id="topicGroup">
-                    <label for="topic">Topic *</label>
-                    <input type="text" id="topic" placeholder="e.g., Ayah kurang tidur">
+                    <label for="topic">Topic *
+                        <span style="font-size: 12px; color: #666; font-weight: normal;">- Short phrase describing your story idea</span>
+                    </label>
+                    <input type="text" id="topic" placeholder="e.g., A day at the beach, Making breakfast, Learning to ride a bike">
+                    <small style="color: #888; display: block; margin-top: 4px;">💡 Tip: Keep it simple and clear. AI will create the full story.</small>
                 </div>
 
                 <!-- Story Prompt Input (for prompt mode) -->
                 <div class="form-group hidden" id="storyPromptGroup">
-                    <label for="storyPromptText">Story Prompt *</label>
-                    <textarea id="storyPromptText" rows="4" placeholder="Describe the story you want to create. AI will generate narrations based on your prompt."></textarea>
+                    <label for="storyPromptText">Story Prompt *
+                        <span style="font-size: 12px; color: #666; font-weight: normal;">- Describe the story flow you want</span>
+                    </label>
+                    <textarea id="storyPromptText" rows="4" placeholder="Example: A child wakes up excited for their birthday. They help prepare decorations. Friends arrive and they play games. Finally, they blow out candles on a cake."></textarea>
+                    <small style="color: #888; display: block; margin-top: 4px;">💡 Tip: Describe key story beats. AI will create engaging narrations.</small>
                 </div>
 
                 <!-- Existing Narrations (for narrations mode) -->
                 <div class="form-group hidden" id="narrationsGroup">
-                    <label for="existingNarrations">Existing Narrations * (one per line)</label>
+                    <label for="existingNarrations">Existing Narrations * (one per line)
+                        <span style="font-size: 12px; color: #666; font-weight: normal;">- Write complete narration for each scene</span>
+                    </label>
                     <textarea id="existingNarrations" rows="8" placeholder="Scene 1: First narration here...
 Scene 2: Second narration here...
 Scene 3: Third narration here..."></textarea>
-                    <small style="color: #666;">Enter one narration per line. Each line becomes a scene.</small>
+                    <small style="color: #888; display: block; margin-top: 4px;">💡 Tip: Each line = one scene. AI will generate matching images.</small>
                 </div>
 
                 <!-- Target Scene Duration (for narrations mode) -->
@@ -713,31 +723,36 @@ Scene 3: Third narration here..."></textarea>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="ttsProvider">TTS Provider *</label>
+                        <label for="ttsProvider">TTS Provider *
+                            <span style="font-size: 12px; color: #666; font-weight: normal;">- Choose voice generation service</span>
+                        </label>
                         <select id="ttsProvider" required onchange="switchTtsProvider()">
-                            <option value="edge-tts">Edge TTS (Free)</option>
-                            <option value="gemini-tts">Gemini TTS (Premium)</option>
-                            <option value="pollinations-tts">Pollinations TTS (Free)</option>
+                            <option value="edge-tts">Edge TTS - Free, 400+ voices, best quality</option>
+                            <option value="gemini-tts">Gemini TTS - Premium, 30 natural voices (requires API key)</option>
+                            <option value="pollinations-tts">Pollinations TTS - Free, 6 high-quality voices</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label>&nbsp;</label>
-                        <div style="padding: 10px; background: #f5f5f5; border-radius: 8px; font-size: 13px;">
-                            <strong>TTS Provider Info:</strong><br>
-                            <span id="ttsProviderInfo">Edge TTS: Free, 400+ voices</span>
+                        <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 13px; border-left: 4px solid #2196f3;">
+                            <strong>💡 TTS Info:</strong><br>
+                            <span id="ttsProviderInfo">Edge TTS: Free, 400+ voices, excellent quality</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Speaker Voice *</label>
-                    <input type="text" id="selectedSpeaker" readonly placeholder="Select a speaker from the list below">
+                    <label>Speaker Voice *
+                        <span style="font-size: 12px; color: #666; font-weight: normal;">- Select voice for narration</span>
+                    </label>
+                    <input type="text" id="selectedSpeaker" readonly placeholder="👆 Click a voice from the list below to select">
                     <input type="hidden" id="selectedTtsProvider" value="edge-tts">
+                    <small style="color: #888; display: block; margin-top: 4px; margin-bottom: 8px;">💡 Tip: Use the tabs to switch providers, then click ▶ to preview voices before selecting.</small>
                     
                     <div class="speaker-container" id="speakerContainer">
                         <div class="speaker-search">
-                            <input type="text" id="speakerSearch" placeholder="Search speakers..." onkeyup="filterSpeakers()">
+                            <input type="text" id="speakerSearch" placeholder="🔍 Search speakers by name, language, or gender..." onkeyup="filterSpeakers()">
                         </div>
                         
                         <div class="speaker-filters">
@@ -946,13 +961,13 @@ Scene 3: Third narration here..."></textarea>
             if (infoElement) {
                 switch(provider) {
                     case 'edge-tts':
-                        infoElement.innerHTML = 'Edge TTS: Free, 400+ voices, preview available';
+                        infoElement.innerHTML = '<strong>Edge TTS:</strong> Free Microsoft service with 400+ voices in 100+ languages. Excellent quality and preview available. ✅ Recommended for most users.';
                         break;
                     case 'gemini-tts':
-                        infoElement.innerHTML = 'Gemini TTS: Premium (requires API key), 30 natural voices';
+                        infoElement.innerHTML = '<strong>Gemini TTS:</strong> Premium Google AI voices (requires API key). 30 ultra-natural multilingual voices with samples available. 💎 Best for professional quality.';
                         break;
                     case 'pollinations-tts':
-                        infoElement.innerHTML = 'Pollinations TTS: Free, 6 high-quality voices';
+                        infoElement.innerHTML = '<strong>Pollinations TTS:</strong> Free OpenAI-powered voices. 6 high-quality English voices (alloy, echo, fable, onyx, nova, shimmer). 🌱 Good alternative.';
                         break;
                 }
             }
@@ -1094,8 +1109,8 @@ Scene 3: Third narration here..."></textarea>
                 // Check if preview is available
                 const previewAvailable = provider === 'edge-tts' || (provider === 'gemini-tts' && sampleUrl);
                 const previewBtn = previewAvailable 
-                    ? `<button class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', '${provider}', this, '${sampleUrl}')" title="Preview voice">▶</button>`
-                    : `<button class="speaker-btn play-btn" disabled title="Preview unavailable" style="opacity: 0.5; cursor: not-allowed;">🔇</button>`;
+                    ? `<button type="button" class="speaker-btn play-btn" onclick="playVoice('${speaker.shortName}', '${provider}', this, '${sampleUrl}')" title="Preview voice">▶</button>`
+                    : `<button type="button" class="speaker-btn play-btn" disabled title="Preview unavailable" style="opacity: 0.5; cursor: not-allowed;">🔇</button>`;
                 
                 return `
                     <div class="speaker-item ${isSelected ? 'selected' : ''}" onclick="selectSpeaker('${speaker.shortName}', '${provider}', this)">
@@ -1111,7 +1126,7 @@ Scene 3: Third narration here..."></textarea>
                         </div>
                         <div class="speaker-actions" onclick="event.stopPropagation()">
                             ${previewBtn}
-                            <button class="speaker-btn fav-btn ${isFavorite ? 'favorited' : ''}" onclick="toggleFavorite('${speaker.shortName}', this)" title="Add to favorites">${isFavorite ? '★' : '☆'}</button>
+                            <button type="button" class="speaker-btn fav-btn ${isFavorite ? 'favorited' : ''}" onclick="toggleFavorite('${speaker.shortName}', this)" title="Add to favorites">${isFavorite ? '★' : '☆'}</button>
                         </div>
                     </div>
                 `;
