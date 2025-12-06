@@ -227,12 +227,18 @@ export class GeminiTtsService {
     );
 
     // Validate voice name
+    if (this.geminiVoices.length === 0) {
+      throw new Error(
+        'No Gemini TTS voices available. Service configuration error.',
+      );
+    }
+
     const validVoice = this.geminiVoices.find(
       (v) => v.name.toLowerCase() === voiceName.toLowerCase(),
     );
     if (!validVoice) {
       this.logger.warn(
-        `Voice "${voiceName}" not found in valid voices list. Using first available voice.`,
+        `Voice "${voiceName}" not found in valid voices list. Using default voice "${this.geminiVoices[0].name}".`,
       );
       voiceName = this.geminiVoices[0].name;
     } else {
