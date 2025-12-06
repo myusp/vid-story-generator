@@ -236,16 +236,20 @@ export class SpeakersService {
       res.end(audioBuffer);
 
       // Cleanup temp file
-      await fs.unlink(outputPath).catch(() => {
-        // Ignore cleanup errors
+      await fs.unlink(outputPath).catch((err) => {
+        this.logger.debug(
+          `Failed to cleanup temp file ${outputPath}: ${err.message}`,
+        );
       });
     } catch (error) {
       this.logger.error(`TTS generation failed: ${error.message}`);
       res.status(500).json({ error: 'Failed to generate TTS audio' });
 
       // Cleanup on error
-      await fs.unlink(outputPath).catch(() => {
-        // Ignore cleanup errors
+      await fs.unlink(outputPath).catch((err) => {
+        this.logger.debug(
+          `Failed to cleanup temp file ${outputPath}: ${err.message}`,
+        );
       });
     }
   }
