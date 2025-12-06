@@ -1080,6 +1080,9 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
         this.logger.warn(
           `AI call failed with ${currentProvider} (attempt ${retryCount + 1}/${this.maxRetries + 1}): ${error.message}. Retrying with next API key in ${this.retryDelay}ms...`,
         );
+        this.logger.warn(
+          `Prompt causing error (first 200 chars): ${prompt.substring(0, 200)}...`,
+        );
         await this.sleep(this.retryDelay);
 
         // Try with next API key from the same provider
@@ -1123,6 +1126,7 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
       this.logger.error(
         `AI call failed after ${this.maxRetries + 1} attempts with ${currentProvider}: ${error.message}`,
       );
+      this.logger.error(`Full prompt causing error: ${prompt}`);
       throw error;
     }
   }
