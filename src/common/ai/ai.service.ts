@@ -1137,7 +1137,7 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
     // const baseUrl = this.configService.get<string>('GEMINI_API_URL');
     const modelName = this.configService.get<string>(
       'GEMINI_MODEL',
-      'gemini-2.0-flash-exp',
+      'gemini-2.5-flash',
     );
 
     const genAI = new GoogleGenerativeAI(apiKey);
