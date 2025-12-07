@@ -13,7 +13,7 @@ import { LogsService } from '../logs/logs.service';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SrtGenerator } from '../../common/utils/srt-generator';
-import { TtsService } from '../../common/tts/tts.service';
+import { TtsCoordinatorService } from '../../common/tts/tts-coordinator.service';
 import { TtsQueueService } from '../../common/tts/tts-queue.service';
 import type { SubtitleWordBoundary } from '../../common/tts/tts.service';
 import { textToProsodySegments } from '../../common/utils/punctuation-splitter';
@@ -27,7 +27,7 @@ export class StoryService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private aiService: AiService,
-    private ttsService: TtsService,
+    private ttsCoordinator: TtsCoordinatorService,
     private ttsQueueService: TtsQueueService,
     private imageService: ImageService,
     private ffmpegService: FfmpegService,
@@ -124,6 +124,7 @@ export class StoryService {
         genre: dto.genre,
         language: dto.language,
         speakerCode: dto.speaker,
+        ttsProvider: dto.ttsProvider || 'edge-tts',
         orientation: dto.orientation,
         totalImages,
         modelProvider: dto.modelProvider,
@@ -456,10 +457,45 @@ export class StoryService {
           `Generating prosody segments and animations (${scenesWithoutProsody.length} remaining)...`,
         );
 
+        // Check if using Gemini TTS
+        const isGeminiTts = project.ttsProvider === 'gemini-tts';
+        const styleInstructionsMap = new Map<number, string>();
+
+        if (isGeminiTts) {
+          try {
+            // Generate style instructions in batch
+            const styleInstructions =
+              await this.aiService.generateStyleInstructionsBatch(
+                scenesWithoutProsody.map((s) => ({
+                  order: s.order,
+                  narration: s.narration,
+                })),
+                project.narrativeTone || '',
+                provider,
+              );
+            styleInstructions.forEach((item) =>
+              styleInstructionsMap.set(item.order, item.style),
+            );
+          } catch (error) {
+            this.logger.warn(
+              `Failed to generate style instructions: ${error.message}`,
+            );
+          }
+        }
+
         // Update scenes with prosody data (punctuation-based) and generate animations
         for (const scene of scenesWithoutProsody) {
-          // Use punctuation-based splitting instead of AI for prosody segments
-          const prosodyData = textToProsodySegments(scene.narration);
+          let prosodyData: any;
+
+          if (isGeminiTts) {
+            const style =
+              styleInstructionsMap.get(scene.order) ||
+              'Read aloud in a neutral tone';
+            prosodyData = { style };
+          } else {
+            // Use punctuation-based splitting instead of AI for prosody segments
+            prosodyData = textToProsodySegments(scene.narration);
+          }
 
           // Generate animations with allowed animations filter
           const animations = await this.aiService.generateAnimations(
@@ -640,36 +676,65 @@ export class StoryService {
                       projectId,
                       'INFO',
                       'GENERATING_TTS',
-                      `Generating audio for scene ${scene.order}/${scenesNeedingAudio.length} (attempt ${attempt}/${maxRetries})...`,
+                      `Generating audio for scene ${scene.order}/${scenesNeedingAudio.length} (attempt ${attempt}/${maxRetries}) using ${project.ttsProvider || 'edge-tts'}...`,
                     );
+
+                    const ttsProvider = (project.ttsProvider || 'edge-tts') as
+                      | 'edge-tts'
+                      | 'gemini-tts'
+                      | 'pollinations-tts';
 
                     if (scene.prosodyData) {
                       try {
-                        const prosodySegments = JSON.parse(
+                        const prosodyData = JSON.parse(
                           scene.prosodyData as string,
                         );
-                        result =
-                          await this.ttsService.generateSpeechWithProsody(
-                            prosodySegments,
+
+                        if (ttsProvider === 'gemini-tts' && prosodyData.style) {
+                          result =
+                            await this.ttsCoordinator.generateSpeechWithStyle(
+                              scene.narration,
+                              prosodyData.style,
+                              project.speakerCode,
+                              audioPath,
+                              ttsProvider,
+                            );
+                        } else if (Array.isArray(prosodyData)) {
+                          result =
+                            await this.ttsCoordinator.generateSpeechWithProsody(
+                              prosodyData,
+                              project.speakerCode,
+                              audioPath,
+                              ttsProvider,
+                            );
+                        } else {
+                          // Fallback if prosodyData format is unknown
+                          result = await this.ttsCoordinator.generateSpeech(
+                            scene.narration,
                             project.speakerCode,
                             audioPath,
+                            ttsProvider,
+                            false,
                           );
+                        }
                       } catch (parseError) {
                         this.logger.warn(
                           `Prosody parsing failed for scene ${scene.order}: ${parseError.message}`,
                         );
-                        result = await this.ttsService.generateSpeech(
+                        result = await this.ttsCoordinator.generateSpeech(
                           scene.narration,
                           project.speakerCode,
                           audioPath,
+                          ttsProvider,
                           false,
                         );
                       }
                     } else {
-                      result = await this.ttsService.generateSpeech(
+                      result = await this.ttsCoordinator.generateSpeech(
                         scene.narration,
                         project.speakerCode,
                         audioPath,
+                        ttsProvider,
                         false,
                       );
                     }

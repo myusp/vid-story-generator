@@ -288,27 +288,40 @@ Return ONLY a JSON object in this exact format:
     const toneDescription = narrativeTone
       ? ` with a ${narrativeTone} tone`
       : '';
-    const prompt = `Create a story for a ${totalScenes}-scene short video about: "${topic}" in ${genre} genre${toneDescription}. Language: ${language}.
+    const prompt = `Create dynamic, engaging narrations for a ${totalScenes}-scene short video about: "${topic}" in ${genre} genre${toneDescription}. Language: ${language}.
 
-Generate ONLY the narration text for each scene. Make it engaging and suitable for shorts format.
+CONTENT SAFETY GUIDELINES (CRITICAL):
+- DO NOT generate content involving violence, harm, illegal activities, or adult themes
+- Keep content family-friendly and appropriate for all ages
+- Avoid controversial topics, politics, or sensitive subjects
+- Focus on positive, uplifting, or educational themes
 
-IMPORTANT LANGUAGE RULES (STRICT):
-- Use VERY SIMPLE language suitable for a 10-year-old child.
-- DO NOT use complex words, metaphors, or flowery language.
-- DO NOT use hyperbolic expressions (e.g., "shattering the silence", "unimaginable beauty").
-- Keep sentences SHORT and DIRECT.
-- Write as if you are talking to a friend, casually and naturally.
-- Avoid dramatic flair unless specifically requested.
+STORYTELLING GUIDELINES FOR DYNAMIC NARRATION:
+- VARY the pacing and emotional tone across scenes (calm to exciting, reflective to energetic)
+- Use DIFFERENT sentence structures (questions, exclamations, statements)
+- Mix SHORT punchy sentences with slightly LONGER flowing ones
+- Include SPECIFIC sensory details (what you see, hear, feel)
+- Use ACTIVE verbs and present tense for immediacy
+- Add EMOTIONAL variety (wonder, excitement, curiosity, satisfaction)
+- Create a clear story ARC with beginning, development, and satisfying conclusion
+- Make each scene feel DISTINCT in mood and perspective
+
+LANGUAGE RULES:
+- Use conversational, natural language (like telling a story to a friend)
+- Keep sentences clear and direct
+- Use vivid, concrete words instead of abstract ones
+- Vary sentence length to create rhythm
+- Avoid repetitive patterns or monotonous structure
 
 Return ONLY a JSON array in this exact format:
 [
   {
     "order": 1,
-    "narration": "narration text in ${language}"
+    "narration": "engaging narration text in ${language} with varied emotion and pacing"
   }
 ]
 
-Create exactly ${totalScenes} narrations.`;
+Create exactly ${totalScenes} narrations with MAXIMUM VARIETY in tone, pacing, and emotional energy.`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const narrations = JSON.parse(this.extractJSON(response));
@@ -333,7 +346,7 @@ Create exactly ${totalScenes} narrations.`;
     const toneDescription = narrativeTone
       ? ` with a ${narrativeTone} tone`
       : '';
-    const prompt = `Create narrations for a ${totalScenes}-scene short video based on this story outline:
+    const prompt = `Create dynamic, engaging narrations for a ${totalScenes}-scene short video based on this story outline:
 
 "${storyPrompt}"
 
@@ -341,26 +354,31 @@ Genre: ${genre}
 Language: ${language}
 Style: ${toneDescription}
 
-Generate ONLY the narration text for each scene. Each narration should be a single paragraph that flows naturally when spoken.
-Make it engaging and suitable for shorts format.
+CONTENT SAFETY GUIDELINES (CRITICAL):
+- DO NOT generate content involving violence, harm, illegal activities, or adult themes
+- Keep content family-friendly and appropriate for all ages
+- Avoid controversial topics, politics, or sensitive subjects
+- Focus on positive, uplifting, or educational themes
 
-IMPORTANT LANGUAGE RULES (STRICT):
-- Use VERY SIMPLE language suitable for a 10-year-old child.
-- DO NOT use complex words, metaphors, or flowery language.
-- DO NOT use hyperbolic expressions (e.g., "shattering the silence", "unimaginable beauty").
-- Keep sentences SHORT and DIRECT.
-- Write as if you are talking to a friend, casually and naturally.
-- Avoid dramatic flair unless specifically requested.
+STORYTELLING GUIDELINES:
+- Create DISTINCT emotional progression across scenes
+- VARY pacing (some scenes calm, others energetic)
+- Use DIFFERENT narrative perspectives or focuses for variety
+- Include SPECIFIC sensory details
+- Mix sentence lengths and structures to avoid monotony
+- Build to a satisfying conclusion
+
+Generate ONLY the narration text for each scene. Each narration should be a single paragraph that flows naturally when spoken.
 
 Return ONLY a JSON array in this exact format:
 [
   {
     "order": 1,
-    "narration": "narration text in ${language}"
+    "narration": "engaging narration text in ${language}"
   }
 ]
 
-Create exactly ${totalScenes} narrations that tell the complete story.`;
+Create exactly ${totalScenes} narrations that tell the complete story with maximum variety in tone and pacing.`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const narrations = JSON.parse(this.extractJSON(response));
@@ -629,21 +647,32 @@ Generate exactly ${narrations.length} results, one for each scene.`;
 The prompt should be in English and describe:
 - Main subject/characters (use the character descriptions above if they appear in this scene)
 - Setting/environment (maintain consistency with previous scene if continuing the same location)
-- Mood/atmosphere
-- Visual details
-- Composition
+- Mood/atmosphere with specific lighting details (golden hour, soft shadows, dramatic lighting, etc.)
+- Visual details including colors, textures, materials
+- Composition (camera angle, perspective, depth of field)
+- Artistic elements (bokeh, lens flare, color grading, etc.)
 
-IMPORTANT RULES FOR VARIETY:
-1. **AVOID PORTRAIT-STYLE IMAGES.** Do NOT focus solely on the character's face unless necessary for emotion.
-2. **VARY THE FOCUS:** Focus on the **EVENT**, **ACTIVITY**, or **SETTING** described in the narration.
-3. **USE DYNAMIC ANGLES:** Use wide shots, over-the-shoulder, or point-of-view shots to show the scene context.
-4. Characters should be DOING something related to the narration, not just standing/posing.
-5. Maintain visual continuity with the previous scene if applicable.
-6. DO NOT include any text, labels, words, letters, or numbers in the image.`;
+ENHANCED PROMPT STRUCTURE (use this format):
+"[Main Subject/Action] in [Setting/Environment], [Camera Angle/Composition], [Lighting Description], [Mood/Atmosphere], [Additional Visual Details including colors, textures, effects]"
+
+EXAMPLE OF HIGH-QUALITY PROMPT:
+"A stunningly beautiful young woman with sharp facial features and flowing multidimensional hair cascading down her back in soft waves, wearing elegant summer top and jeans with minimal classic jewelry, gazing gracefully at camera with gentle smile and wide piercing eyes, cradling a big bouquet of vibrant roses with shimmering silk petals embellished with delicate gems, standing near a giant floral-vine tree with cascading flowers, hyper-realistic image with slight anime theme, vibrant colorful portrait, full body view, soft natural lighting with dappled sunlight, shallow depth of field, professional photography"
+
+IMPORTANT RULES FOR VARIETY AND QUALITY:
+1. AVOID PORTRAIT-STYLE IMAGES. Do NOT focus solely on character face unless emotion is central to the scene.
+2. VARY THE FOCUS: Focus on the EVENT, ACTIVITY, or SETTING described in the narration.
+3. USE DYNAMIC ANGLES: Use wide shots, over-the-shoulder, bird eye view, low angle, or point-of-view shots.
+4. BE SPECIFIC WITH DETAILS: Include specific colors, textures, materials (silk, leather, wood, metal, glass)
+5. ADD LIGHTING DETAILS: Mention lighting quality (soft morning light, golden hour, studio lighting, rim light, etc.)
+6. INCLUDE ATMOSPHERIC ELEMENTS: Weather, time of day, season, particles in air (dust motes, rain, snow)
+7. Characters should be DOING something related to the narration, not just standing or posing.
+8. Maintain visual continuity with the previous scene if applicable.
+9. DO NOT include any text, labels, words, letters, or numbers in the image.
+10. Use artistic photography terms when applicable (bokeh, depth of field, rule of thirds, leading lines)`;
 
     const educationalPromptContent = `
 The prompt should be in English and describe a UNIQUE EDUCATIONAL ILLUSTRATION:
-- A specific visual representation of THIS scene's narration content
+- A specific visual representation of THIS scene narration content
 - Visual metaphors or representations of abstract concepts
 - Clean, clear composition focused on the educational message
 - Objects, abstract shapes, nature elements, or technology items
@@ -654,7 +683,7 @@ IMPORTANT RULES FOR EDUCATIONAL ILLUSTRATIONS:
 3. Use visual metaphors and symbolic representations to explain concepts.
 4. Make this scene visually DIFFERENT from previous scenes - use varied subjects.
 5. The illustration should be self-explanatory and support the narration text.
-6. Focus on unique objects or metaphors that haven't been used in previous scenes.`;
+6. Focus on unique objects or metaphors that have not been used in previous scenes.`;
 
     const prompt = `Based on this narration: "${narration}"
 ${characterContext}${previousContext}
@@ -684,6 +713,49 @@ Return ONLY the image prompt as plain text, no JSON.`;
       characterDescriptions,
       null,
     );
+  }
+
+  /**
+   * Generate style instructions for Gemini TTS
+   */
+  async generateStyleInstructionsBatch(
+    narrations: Array<{ order: number; narration: string }>,
+    narrativeTone: string,
+    provider: 'gemini' | 'openai',
+  ): Promise<Array<{ order: number; style: string }>> {
+    const toneDescription = narrativeTone
+      ? ` with a ${narrativeTone} tone`
+      : '';
+    const narrationsText = narrations
+      .map((n) => `Scene ${n.order}: "${n.narration}"`)
+      .join('\n');
+
+    const prompt = `Generate a style instruction for Gemini TTS for each of these narrations${toneDescription}.
+
+The style instruction should describe HOW the text should be read (e.g., "Read aloud in a warm, welcoming tone", "Read with excitement and energy", "Read in a whisper", "Read with a serious, dramatic tone").
+
+Narrations:
+${narrationsText}
+
+IMPORTANT: You MUST return a result for EACH scene with the EXACT order number specified above.
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "order": 1,
+    "style": "Read aloud in a warm, welcoming tone"
+  }
+]
+
+Generate exactly ${narrations.length} results, one for each scene.`;
+
+    const response = await this.callAIWithRetry(prompt, provider);
+    const results = JSON.parse(this.extractJSON(response));
+
+    return results.map((item: any, index: number) => ({
+      order: item.order != null ? parseInt(String(item.order), 10) : index + 1,
+      style: item.style || 'Read aloud in a neutral tone',
+    }));
   }
 
   /**
@@ -987,22 +1059,37 @@ Return ONLY a JSON object:
     totalImages: number,
     provider: 'gemini' | 'openai',
   ): Promise<SceneData[]> {
-    const prompt = `Create a story for a ${totalImages}-scene short video about: "${topic}" in ${genre} genre. Language: ${language}.
+    const prompt = `Create a dynamic, engaging story for a ${totalImages}-scene short video about: "${topic}" in ${genre} genre. Language: ${language}.
+
+CONTENT SAFETY GUIDELINES (CRITICAL):
+- DO NOT generate content involving violence, harm, illegal activities, or adult themes
+- Keep content family-friendly and appropriate for all ages
+- Avoid controversial topics, politics, or sensitive subjects
+- Focus on positive, uplifting, or educational themes
+
+STORYTELLING GUIDELINES:
+- Make each scene VISUALLY DISTINCT with varied settings and actions
+- Use EMOTIONAL VARIETY - mix calm moments with exciting ones
+- Add SPECIFIC DETAILS that bring scenes to life (colors, sounds, movements)
+- Create a CLEAR PROGRESSION with beginning, middle, and satisfying end
+- Use ACTIVE voice and DYNAMIC verbs to maintain energy
+- Vary narration LENGTH and RHYTHM to avoid monotony
+- Include sensory details (what characters see, hear, feel)
 
 For each scene, provide:
-1. A detailed image generation prompt (in English, visual description)
-2. Narration text (in ${language})
+1. A detailed, vivid image generation prompt (in English) - describe the visual scene with specific details about setting, lighting, mood, character positions, and actions
+2. Narration text (in ${language}) - make it conversational and engaging, varying sentence structure and emotional tone
 
 Return ONLY a JSON array in this exact format:
 [
   {
     "order": 1,
-    "imagePrompt": "detailed visual description for AI image generation",
-    "narration": "narration text in ${language}"
+    "imagePrompt": "detailed visual description for AI image generation with specific details about setting, lighting, colors, character position, and mood",
+    "narration": "engaging narration text in ${language} with varied tone and emotion"
   }
 ]
 
-Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts format.`;
+Create exactly ${totalImages} scenes with MAXIMUM VARIETY in pacing, emotion, and visual composition.`;
 
     const response = await this.callAIWithRetry(prompt, provider);
     const scenes = JSON.parse(this.extractJSON(response));
@@ -1032,10 +1119,28 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
     } catch (error) {
       const currentProvider = provider;
 
+      // Check if this is a 429 rate limit error
+      const isRateLimitError =
+        error.message?.includes('429') ||
+        error.message?.includes('rate limit') ||
+        error.message?.includes('RESOURCE_EXHAUSTED') ||
+        error.message?.includes('quota');
+
+      if (isRateLimitError) {
+        this.logger.warn(
+          `Rate limit (429) detected for ${currentProvider} - switching to next API key immediately`,
+        );
+        // Reset retry counter when switching keys for rate limit
+        return this.callAIWithRetry(prompt, currentProvider, 0, failedKeys);
+      }
+
       // Try with different API key of the same provider
       if (retryCount < this.maxRetries) {
         this.logger.warn(
           `AI call failed with ${currentProvider} (attempt ${retryCount + 1}/${this.maxRetries + 1}): ${error.message}. Retrying with next API key in ${this.retryDelay}ms...`,
+        );
+        this.logger.warn(
+          `Prompt causing error (first 200 chars): ${prompt.substring(0, 200)}...`,
         );
         await this.sleep(this.retryDelay);
 
@@ -1080,6 +1185,7 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
       this.logger.error(
         `AI call failed after ${this.maxRetries + 1} attempts with ${currentProvider}: ${error.message}`,
       );
+      this.logger.error(`Full prompt causing error: ${prompt}`);
       throw error;
     }
   }
@@ -1090,7 +1196,7 @@ Create exactly ${totalImages} scenes. Make it engaging and suitable for shorts f
     // const baseUrl = this.configService.get<string>('GEMINI_API_URL');
     const modelName = this.configService.get<string>(
       'GEMINI_MODEL',
-      'gemini-2.0-flash-exp',
+      'gemini-2.5-flash',
     );
 
     const genAI = new GoogleGenerativeAI(apiKey);

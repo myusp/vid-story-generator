@@ -254,52 +254,61 @@ export class FfmpegService {
     const fps = this.VIDEO_FPS;
     const frames = Math.floor(duration * fps);
 
-    // Increase zoom ranges for more dynamic, noticeable movements
-    // Pan uses 1.1x zoom for more dramatic effect
-    // Regular zoom animations use larger ranges for better visual impact
-    const zoomSlowIncrement = 0.06 / frames; // 1.0 → 1.06 (increased from 1.02)
-    const zoomInIncrement = 0.12 / frames; // 1.0 → 1.12 (increased from 1.04)
-    const zoomOutDecrement = 0.15 / frames; // 1.15 → 1.0 (increased from 1.05)
+    // For longer durations (>10s), use smoother, more gradual movements
+    // This prevents choppy appearance by using smaller increments with more iterations
+    const isLongDuration = duration > 10;
+    const smoothnessFactor = isLongDuration ? 1.5 : 1.0; // Increase zoom range for smoother motion
 
-    // Pan increment per frame - use larger zoom (1.1) for more visible movement
+    // Increase zoom ranges for more dynamic, noticeable movements
+    // Pan uses increased zoom for more dramatic effect on longer scenes
+    // Regular zoom animations use larger ranges for better visual impact
+    const panZoom = isLongDuration ? 1.15 : 1.1; // Higher zoom for longer scenes for smoother panning
+    const zoomSlowIncrement = (0.06 * smoothnessFactor) / frames; // 1.0 → 1.06/1.09
+    const zoomInIncrement = (0.12 * smoothnessFactor) / frames; // 1.0 → 1.12/1.18
+    const zoomOutDecrement = (0.15 * smoothnessFactor) / frames; // 1.15/1.225 → 1.0
+
+    // Pan increment per frame - smoother for longer durations
     const panIncrement = 1.0 / frames;
 
     switch (animation) {
       case 'pan-left': {
-        // Pan from right to left with 1.1x zoom for more dramatic movement
+        // Pan from right to left with dynamic zoom for smoother movement on longer scenes
         // x starts at max (right), decrements to 0 (left)
-        return `zoompan=z=1.1:x='(iw-iw/zoom)*(1-${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        return `zoompan=z=${panZoom}:x='(iw-iw/zoom)*(1-${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'pan-right': {
-        // Pan from left to right with 1.1x zoom
+        // Pan from left to right with dynamic zoom
         // x starts at 0 (left), increments to max (right)
-        return `zoompan=z=1.1:x='(iw-iw/zoom)*(${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        return `zoompan=z=${panZoom}:x='(iw-iw/zoom)*(${panIncrement}*on)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'pan-up': {
-        // Pan from bottom to top, centered horizontally with 1.1x zoom
-        return `zoompan=z=1.1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-${panIncrement}*on)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        // Pan from bottom to top, centered horizontally with dynamic zoom
+        return `zoompan=z=${panZoom}:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-${panIncrement}*on)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'pan-down': {
-        // Pan from top to bottom with 1.1x zoom
-        return `zoompan=z=1.1:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(${panIncrement}*on)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        // Pan from top to bottom with dynamic zoom
+        return `zoompan=z=${panZoom}:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(${panIncrement}*on)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'zoom-slow': {
-        // Smooth zoom 1.0 → 1.06 using min() to clamp at final zoom
-        return `zoompan=z='min(zoom+${zoomSlowIncrement},1.06)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        // Smooth zoom using dynamic increment for longer scenes
+        const maxZoom = 1.06 * smoothnessFactor;
+        return `zoompan=z='min(zoom+${zoomSlowIncrement},${maxZoom})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'zoom-in': {
-        // Smooth zoom 1.0 → 1.12 using min() to clamp
-        return `zoompan=z='min(zoom+${zoomInIncrement},1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        // Smooth zoom using dynamic increment for longer scenes
+        const maxZoom = 1.12 * smoothnessFactor;
+        return `zoompan=z='min(zoom+${zoomInIncrement},${maxZoom})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'zoom-out': {
-        // Smooth zoom out 1.15 → 1.0 using max() to clamp at 1.0
-        return `zoompan=z='max(1.15-${zoomOutDecrement}*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
+        // Smooth zoom out using dynamic decrement for longer scenes
+        const startZoom = 1.15 * smoothnessFactor;
+        return `zoompan=z='max(${startZoom}-${zoomOutDecrement}*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=${fps}`;
       }
 
       case 'static':
