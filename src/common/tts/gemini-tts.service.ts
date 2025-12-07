@@ -252,12 +252,13 @@ export class GeminiTtsService {
     let lastError: Error | null = null;
     let attempt = 0;
 
-    // Track attempts per API key to handle rate limits
-    let attemptsSinceKeyRotation = 0;
+    // Track total attempts to prevent infinite loops if all keys are rate limited
+    let totalAttempts = 0;
+    const maxTotalAttempts = 10;
 
-    while (attempt < maxRetries) {
+    while (attempt < maxRetries && totalAttempts < maxTotalAttempts) {
       attempt++;
-      attemptsSinceKeyRotation++;
+      totalAttempts++;
 
       try {
         // Ensure output directory exists
@@ -305,7 +306,7 @@ export class GeminiTtsService {
 
         // Generate content stream
         this.logger.log(
-          `Calling Gemini TTS API (attempt ${attempt}/${maxRetries}, key attempts: ${attemptsSinceKeyRotation}) with voice: ${voiceName}`,
+          `Calling Gemini TTS API (attempt ${attempt}/${maxRetries}, total: ${totalAttempts}/${maxTotalAttempts}) with voice: ${voiceName}`,
         );
         const response = await ai.models.generateContentStream({
           model: this.geminiTtsModel,
@@ -379,7 +380,7 @@ export class GeminiTtsService {
       } catch (error) {
         lastError = error;
         this.logger.error(
-          `Gemini TTS synthesis failed (attempt ${attempt}/${maxRetries}): ${error.message}`,
+          `Gemini TTS synthesis failed (attempt ${attempt}/${maxRetries}, total: ${totalAttempts}/${maxTotalAttempts}): ${error.message}`,
         );
 
         // Check if this is a 429 rate limit error
@@ -391,11 +392,10 @@ export class GeminiTtsService {
 
         if (isRateLimitError) {
           this.logger.warn(
-            'Rate limit (429) detected - switching to next API key and resetting retry counter',
+            'Rate limit (429) detected - switching to next API key and resetting per-key retry counter',
           );
-          // Reset attempts since we're switching to a new key
+          // Reset per-key attempts since we're switching to a new key
           attempt = 0;
-          attemptsSinceKeyRotation = 0;
           // Get next key on next iteration
           continue;
         }
@@ -409,7 +409,8 @@ export class GeminiTtsService {
           error.code === 'ETIMEDOUT';
 
         if (isTransientError && attempt < maxRetries) {
-          const waitTime = Math.pow(2, attemptsSinceKeyRotation) * 1000; // Exponential backoff
+          // Use attempt (not attemptsSinceKeyRotation) for consistent exponential backoff
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
           this.logger.log(`Retrying in ${waitTime}ms...`);
           await new Promise((resolve) => setTimeout(resolve, waitTime));
           continue;
@@ -424,10 +425,12 @@ export class GeminiTtsService {
     }
 
     // All retries failed
-    this.logger.error(`Gemini TTS synthesis failed after ${attempt} attempts`);
+    this.logger.error(
+      `Gemini TTS synthesis failed after ${totalAttempts} total attempts (max retries: ${maxRetries}, max total: ${maxTotalAttempts})`,
+    );
     this.logger.error(lastError?.stack);
     throw new Error(
-      `Gemini TTS synthesis failed after ${attempt} attempts: ${lastError?.message}`,
+      `Gemini TTS synthesis failed after ${totalAttempts} attempts: ${lastError?.message}`,
     );
   }
 
