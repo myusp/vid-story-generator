@@ -1119,6 +1119,21 @@ Create exactly ${totalImages} scenes with MAXIMUM VARIETY in pacing, emotion, an
     } catch (error) {
       const currentProvider = provider;
 
+      // Check if this is a 429 rate limit error
+      const isRateLimitError =
+        error.message?.includes('429') ||
+        error.message?.includes('rate limit') ||
+        error.message?.includes('RESOURCE_EXHAUSTED') ||
+        error.message?.includes('quota');
+
+      if (isRateLimitError) {
+        this.logger.warn(
+          `Rate limit (429) detected for ${currentProvider} - switching to next API key immediately`,
+        );
+        // Reset retry counter when switching keys for rate limit
+        return this.callAIWithRetry(prompt, currentProvider, 0, failedKeys);
+      }
+
       // Try with different API key of the same provider
       if (retryCount < this.maxRetries) {
         this.logger.warn(
